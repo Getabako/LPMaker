@@ -121,11 +121,8 @@ export default function Home() {
       case "init":
         append(
           "info",
-          `生成 ID: ${data.id} ${data.willGenerateImages ? `(画像生成あり / API キー: ${data.apiKeySource ?? "?"})` : "(画像生成なし)"}`,
+          `生成 ID: ${data.id} ${data.willGenerateImages ? "(画像生成あり / Codex 組み込み image_gen)" : "(画像生成なし)"}`,
         );
-        if (data.imageGenSkippedReason) {
-          append("error", data.imageGenSkippedReason);
-        }
         break;
       case "heartbeat":
         // 既存ハートビート行があれば置き換え、無ければ追加
@@ -479,7 +476,7 @@ function Step3({
 
       <Field
         label="画像生成 (gpt-image-2)"
-        hint="OPENAI_API_KEY を ~/.env / VoiceMemory/.env / ~/.lpmaker-data/openai-api-key などから自動検出します。見つからなければ自動でオフ。"
+        hint="Codex 組み込みの image_gen ツールで生成（ChatGPT サブスク内・API キー不要）。サブスク制限などで失敗した場合は画像なしで完成します。"
       >
         <label className="flex items-center gap-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 cursor-pointer">
           <input

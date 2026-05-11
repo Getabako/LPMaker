@@ -17,38 +17,41 @@ export function buildCodexPrompt(brief: LpBrief): string {
 
   const imageBlock = brief.generateImages
     ? `## 画像（重要）
-- 画像は **あなたが直接生成しない**。**外部システムが gpt-image-2 で後から生成する**。
-- あなたの仕事は **images.json** を書き出すこと。中身のスキーマ:
-  \`\`\`json
-  {
-    "model": "gpt-image-2",
-    "images": [
-      {
-        "filename": "hero.png",
-        "prompt": "Photorealistic hero image for a Japanese specialty coffee brand. Soft morning light through a window, hand-pour coffee, wooden table, steam rising. Editorial photography style, warm tones, shallow depth of field.",
-        "size": "1536x1024",
-        "quality": "high"
-      },
-      {
-        "filename": "feature-1.png",
-        "prompt": "Close-up of fresh roasted coffee beans cascading. Natural light, brown tones, high detail.",
-        "size": "1024x1024",
-        "quality": "medium"
-      }
-    ]
-  }
-  \`\`\`
-- 各 image エントリのルール:
-  - filename: 半角英数とハイフンのみ + .png（例: hero.png, feature-1.png, voice-1.png, gallery-3.png）
-  - prompt: **英語**で、被写体・構図・ライティング・スタイル・色味を具体的に指定する。写真品質を狙う（"photorealistic", "editorial photography style" など）。**LP 全体のトーン（${brief.style}・主色 ${brief.primaryColor}・ターゲット ${brief.audience}）に合わせて統一**。
-  - size: "1024x1024" / "1536x1024"（横長：ヒーロー向け）/ "1024x1536"（縦長）のいずれか
-  - quality: "high"（ヒーローや主要セクションのみ）/ "medium"（その他）
-- 枚数の目安: ヒーロー 1 枚 + 各セクションに 1〜2 枚。**合計 4〜8 枚**。
-- index.html では \`<img src="images/<filename>" alt="...">\` で参照する（実ファイルはまだ無いが、後から生成されて埋まる前提で OK）。
-- ⚠️ images/ フォルダは作らなくて良い（外部システムが作る）。images.json だけ書き出す。`
+
+あなた（Codex）に内蔵されている **\`image_gen\` ツール（gpt-image-2 / ChatGPT サブスク内蔵）** を直接呼んで画像を生成し、\`./images/\` 配下に PNG として保存してください。
+
+### 🚨 絶対ルール
+
+- **API キーは使わない**。 \`OPENAI_API_KEY\` を読まない、\`openai\` Python/Node SDK を使わない、\`curl https://api.openai.com\` も叩かない。
+- **スクリプトを書かない**。 image_gen ツールを **直接呼び出して** PNG を吐き出す。
+- 透過背景は使えない（不透明 PNG のみ）。
+- 解像度は 16 の倍数、最大 3840px。
+
+### 生成する枚数の目安
+
+- ヒーロー 1 枚（横長 1536x1024 推奨）
+- 各セクションに 1〜2 枚（1024x1024 や 1024x1536）
+- 合計 **4〜8 枚**
+
+### ファイル名規則
+
+- 半角英数 + ハイフン + \`.png\`（例: \`hero.png\`, \`feature-1.png\`, \`voice-1.png\`, \`gallery-3.png\`）
+- 保存先は **\`./images/\`** 配下（\`mkdir -p images\` してから）
+
+### プロンプトの書き方
+
+各画像のプロンプトは **英語** で、被写体・構図・ライティング・スタイル・色味を具体的に指定。LP 全体のトーン（${brief.style} / 主色 ${brief.primaryColor} / ターゲット ${brief.audience}）に合わせて統一感を持たせる。"photorealistic" "editorial photography" など写真品質を狙う形容詞を入れる。
+
+### index.html での参照
+
+\`<img src="images/<filename>" alt="...">\` の相対パスで参照する。
+
+### 失敗したら
+
+画像生成中にエラー（サブスクのレート制限など）が出たら、**そのまま処理を続けて** index.html だけは必ず完成させる。API キー利用などの代替手段に逃げない。`
     : `## 画像
-- 画像ファイルは作らない。images.json も作らない。
-- CSS グラデーション・インライン SVG アイコン・絵文字・型抜き図形で装飾する。`;
+
+画像ファイルは作らない。\`images/\` フォルダも作らない。CSS グラデーション・インライン SVG アイコン・絵文字で装飾する。`;
 
   return `# あなたへの作業指示
 
@@ -57,7 +60,7 @@ export function buildCodexPrompt(brief: LpBrief): string {
 
 # 🚨 出力ルール（最重要・絶対に守る）
 
-- **HTML/CSS/JS を回答メッセージ本文に書かない**。会話には書かないで、必ずファイルに書く。
+- **HTML/CSS/JS を回答メッセージ本文に書かない**。会話に書かない、必ずファイルに書く。
 - 現在のディレクトリ（cwd）に **\`index.html\` というファイルを作成**する。
 - ファイル作成は **\`apply_patch\` ツール** または **シェルコマンド** で行う。例:
   \`\`\`
@@ -76,7 +79,7 @@ export function buildCodexPrompt(brief: LpBrief): string {
   ...
   HTML
   \`\`\`
-- 最終回答メッセージは **「index.html を作成しました（行数）」程度の 1〜2 行だけ**。HTML の中身は書かない。
+- 最終回答メッセージは **「index.html を作成しました」程度の 1〜2 行**。HTML の中身は書かない。
 
 # 中身の仕様
 
@@ -119,12 +122,13 @@ ${imageBlock}
 # 作業手順
 
 1. 簡単に構成を頭の中で組み立てる（軽く）
-2. **ファイルとして** \`index.html\` を書く（apply_patch / シェル / 適切なツールで）
-${brief.generateImages ? "3. **ファイルとして** `images.json` を書く（後段で画像が生成される）" : ""}
+${brief.generateImages ? "2. **image_gen ツール（gpt-image-2）** で画像を生成して `./images/` に保存（API キーやスクリプトは使わない、組み込みツールを直接呼ぶ）" : ""}
+${brief.generateImages ? "3" : "2"}. **ファイルとして** \`index.html\` を書く（apply_patch / シェル / 適切なツールで）
 ${brief.generateImages ? "4" : "3"}. 完了報告は 1〜2 行だけ
 
-# 🚨 もう一度
+# 🚨 再強調
 
-**HTML を会話の中に書き出さない。ファイルに書く。** これを守らないと作業失敗扱いです。
+- HTML を会話に書き出さない。**ファイルに書く**。
+${brief.generateImages ? "- 画像は **image_gen 内蔵ツールで直接生成**。API キー絶対禁止。" : ""}
 `;
 }

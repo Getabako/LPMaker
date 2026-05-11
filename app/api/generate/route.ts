@@ -4,8 +4,6 @@ import { NextRequest } from "next/server";
 import { getCodex } from "@/lib/codex/client";
 import { paths, ensureDir, newId } from "@/lib/paths";
 import { buildCodexPrompt, LpBrief } from "@/lib/prompt";
-import { findOpenAIKey } from "@/lib/api-key";
-import { generateImages, ImagesManifest } from "@/lib/images";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,14 +20,7 @@ export async function POST(req: NextRequest) {
   const projectDir = paths.projectDir(id);
   ensureDir(projectDir);
 
-  // API キーが見つからなければ画像生成は自動でオフ
-  const { key: apiKey, source: apiKeySource } = brief.generateImages
-    ? findOpenAIKey()
-    : { key: null, source: null };
-  const willGenerateImages = brief.generateImages && !!apiKey;
-  const effectiveBrief: LpBrief = { ...brief, generateImages: willGenerateImages };
-
-  const prompt = buildCodexPrompt(effectiveBrief);
+  const prompt = buildCodexPrompt(brief);
   const srv = await getCodex();
 
   const encoder = new TextEncoder();
@@ -55,12 +46,7 @@ export async function POST(req: NextRequest) {
       send("init", {
         id,
         projectDir,
-        willGenerateImages,
-        apiKeySource,
-        imageGenSkippedReason:
-          brief.generateImages && !apiKey
-            ? "OPENAI_API_KEY が見つかりません。~/.env か ~/.lpmaker-data/openai-api-key にキーを置くか、起動時に env で渡してください。"
-            : null,
+        willGenerateImages: brief.generateImages,
       });
 
       let threadId: string | null = null;
@@ -68,7 +54,6 @@ export async function POST(req: NextRequest) {
       let turnDone = false;
       const startedAt = Date.now();
 
-      // ハートビート（黙りこむのを防ぐ）
       const heartbeat = setInterval(() => {
         const sec = Math.floor((Date.now() - startedAt) / 1000);
         send("heartbeat", { elapsedSec: sec });
@@ -84,7 +69,6 @@ export async function POST(req: NextRequest) {
         const { method, params } = notif;
         if (!params) return;
 
-        // すべてのイベントを生で送るのは多すぎるので、見せたいものだけ整形
         switch (method) {
           case "thread/started":
             threadId = params.thread?.id;
@@ -104,29 +88,22 @@ export async function POST(req: NextRequest) {
                 }`,
               });
               if (params.status.type === "systemError") {
-                // turn/completed が来なくても抜ける
                 turnDone = true;
               }
             }
             return;
           case "turn/plan/updated": {
-            const plan = (params.plan ?? []) as Array<{
-              step: string;
-              status: string;
-            }>;
+            const plan = (params.plan ?? []) as Array<{ step: string; status: string }>;
             const summary = plan
               .map((p) => `${p.status === "completed" ? "✓" : p.status === "inProgress" ? "▸" : "·"} ${p.step}`)
               .join(" / ");
             if (summary) send("step", { kind: "plan", text: `📋 ${summary}` });
             return;
           }
-          case "thread/tokenUsage/updated":
-            // 騒がしいので 30 秒ごとに送る
-            return;
           case "item/started": {
             const item = params.item;
             if (!item) return;
-            if (item.type === "agentMessage") return; // delta で流れる
+            if (item.type === "agentMessage") return;
             if (item.type === "reasoning") {
               send("step", { kind: "reasoning", text: "🧠 思考中…" });
             } else if (item.type === "commandExecution") {
@@ -136,13 +113,15 @@ export async function POST(req: NextRequest) {
               send("step", { kind: "command", text: `$ ${cmd.slice(0, 200)}` });
             } else if (item.type === "fileChange") {
               const files = (item.changes || []).map((c: any) => c.path).join(", ");
-              send("step", { kind: "file", text: `📄 編集: ${files}` });
+              send("step", { kind: "file", text: `📄 ${files}` });
             } else if (item.type === "webSearch") {
               send("step", { kind: "web", text: `🔎 web search: ${item.query ?? ""}` });
             } else if (item.type === "mcpToolCall") {
               send("step", { kind: "tool", text: `🛠 ${item.server}/${item.tool}` });
             } else if (item.type === "dynamicToolCall") {
               send("step", { kind: "tool", text: `🛠 ${item.tool}` });
+            } else if (item.type === "imageView") {
+              send("step", { kind: "image", text: `🖼 imageView` });
             } else {
               send("step", { kind: "info", text: `▸ ${item.type}` });
             }
@@ -152,7 +131,6 @@ export async function POST(req: NextRequest) {
             send("delta", { text: params.delta ?? "" });
             return;
           case "item/reasoning/summaryTextDelta":
-            // 思考の要約は少しずつ見せる
             send("reasoning_delta", { text: params.delta ?? "" });
             return;
           case "item/commandExecution/outputDelta":
@@ -199,33 +177,27 @@ export async function POST(req: NextRequest) {
       try {
         const model = process.env.LPMAKER_MODEL || "gpt-5.5";
         const effort = process.env.LPMAKER_EFFORT || "medium";
-        send("step", { kind: "info", text: `thread/start を送信 (model=${model}, effort=${effort})` });
+        send("step", { kind: "info", text: `thread/start (model=${model}, effort=${effort}, sandbox=danger-full-access)` });
         const started: any = await srv.send("thread/start", {
           cwd: projectDir,
           model,
           effort,
-          sandbox: "workspace-write",
+          sandbox: "danger-full-access",
           approvalPolicy: "never",
           serviceName: "lpmaker",
         });
         threadId = started.thread.id;
 
-        send("step", { kind: "info", text: "turn/start を送信" });
         const turn: any = await srv.send("turn/start", {
           threadId,
           input: [{ type: "text", text: prompt }],
           cwd: projectDir,
           model,
           effort,
-          sandboxPolicy: {
-            type: "workspaceWrite",
-            writableRoots: [projectDir],
-            networkAccess: true,
-          },
+          sandboxPolicy: { type: "dangerFullAccess" },
           approvalPolicy: "never",
         });
         turnId = turn.turn.id;
-        send("step", { kind: "turn", text: `▶ turn: ${turnId}` });
 
         await new Promise<void>((resolve) => {
           const tick = setInterval(() => {
@@ -242,52 +214,10 @@ export async function POST(req: NextRequest) {
 
         const indexPath = path.join(projectDir, "index.html");
         if (!fs.existsSync(indexPath)) {
-          send("error", { message: "index.html が生成されませんでした（Codex の出力を確認してください）" });
+          send("error", { message: "index.html が生成されませんでした" });
           cleanup();
           closeStream();
           return;
-        }
-
-        // === 画像生成フェーズ（サーバ側で OpenAI Images API を叩く）===
-        if (willGenerateImages && apiKey) {
-          const manifestPath = path.join(projectDir, "images.json");
-          if (fs.existsSync(manifestPath)) {
-            try {
-              const manifest = JSON.parse(
-                fs.readFileSync(manifestPath, "utf8"),
-              ) as ImagesManifest;
-              send("step", {
-                kind: "image",
-                text: `🎨 画像 ${manifest.images.length} 点を ${manifest.model ?? "gpt-image-2"} で生成中…`,
-              });
-              await generateImages(projectDir, manifest, apiKey, (p) => {
-                if (p.type === "image") {
-                  send("step", {
-                    kind: p.status === "ok" ? "image-ok" : "image-err",
-                    text:
-                      p.status === "ok"
-                        ? `✓ ${p.filename}`
-                        : `✗ ${p.filename} - ${p.error?.slice(0, 200)}`,
-                  });
-                } else if (p.type === "done") {
-                  send("step", {
-                    kind: "image",
-                    text: `🎨 画像生成完了: ${p.ok} 成功 / ${p.failed} 失敗`,
-                  });
-                }
-              });
-            } catch (err) {
-              send("step", {
-                kind: "error",
-                text: `images.json の読み込み/生成に失敗: ${(err as Error).message}`,
-              });
-            }
-          } else {
-            send("step", {
-              kind: "image",
-              text: "images.json が無いので画像生成をスキップ",
-            });
-          }
         }
 
         const imagesDir = path.join(projectDir, "images");
