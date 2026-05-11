@@ -16,15 +16,38 @@ export function buildCodexPrompt(brief: LpBrief): string {
   const sectionsStr = brief.sections.map((s) => `- ${s}`).join("\n");
 
   const imageBlock = brief.generateImages
-    ? `## 画像
-- 各セクションに合った画像（ヒーローイメージ、特徴の図解、雰囲気写真など）を **あなた自身が生成して** ./images/ フォルダに保存してください。
-- ファイル名は半角英数字とハイフンのみ（例: hero.png, feature-1.png, customer-voice-1.png）。
-- index.html では <img src="images/hero.png" alt="..."> の形で参照する（同一フォルダにある画像を相対パスで）。
-- 画像のスタイルは LP 全体のトーン（${brief.style}・主色 ${brief.primaryColor}）に合わせて統一。
-- 1〜2 枚で済ませず、各セクションを引き立てる枚数を作る。最低 4 枚は欲しい。
-- 画像生成ができない場合は images/ を作らず、CSS / SVG / 絵文字で代用する。HTML 生成は必ず完了させる。`
+    ? `## 画像（重要）
+- 画像は **あなたが直接生成しない**。**外部システムが gpt-image-2 で後から生成する**。
+- あなたの仕事は **images.json** を書き出すこと。中身のスキーマ:
+  \`\`\`json
+  {
+    "model": "gpt-image-2",
+    "images": [
+      {
+        "filename": "hero.png",
+        "prompt": "Photorealistic hero image for a Japanese specialty coffee brand. Soft morning light through a window, hand-pour coffee, wooden table, steam rising. Editorial photography style, warm tones, shallow depth of field.",
+        "size": "1536x1024",
+        "quality": "high"
+      },
+      {
+        "filename": "feature-1.png",
+        "prompt": "Close-up of fresh roasted coffee beans cascading. Natural light, brown tones, high detail.",
+        "size": "1024x1024",
+        "quality": "medium"
+      }
+    ]
+  }
+  \`\`\`
+- 各 image エントリのルール:
+  - filename: 半角英数とハイフンのみ + .png（例: hero.png, feature-1.png, voice-1.png, gallery-3.png）
+  - prompt: **英語**で、被写体・構図・ライティング・スタイル・色味を具体的に指定する。写真品質を狙う（"photorealistic", "editorial photography style" など）。**LP 全体のトーン（${brief.style}・主色 ${brief.primaryColor}・ターゲット ${brief.audience}）に合わせて統一**。
+  - size: "1024x1024" / "1536x1024"（横長：ヒーロー向け）/ "1024x1536"（縦長）のいずれか
+  - quality: "high"（ヒーローや主要セクションのみ）/ "medium"（その他）
+- 枚数の目安: ヒーロー 1 枚 + 各セクションに 1〜2 枚。**合計 4〜8 枚**。
+- index.html では \`<img src="images/<filename>" alt="...">\` で参照する（実ファイルはまだ無いが、後から生成されて埋まる前提で OK）。
+- ⚠️ images/ フォルダは作らなくて良い（外部システムが作る）。images.json だけ書き出す。`
     : `## 画像
-- 画像ファイルは作らない。images/ フォルダも作らない。
+- 画像ファイルは作らない。images.json も作らない。
 - CSS グラデーション・インライン SVG アイコン・絵文字・型抜き図形で装飾する。`;
 
   return `# あなたへの作業指示
@@ -96,9 +119,9 @@ ${imageBlock}
 # 作業手順
 
 1. 簡単に構成を頭の中で組み立てる（軽く）
-2. ${brief.generateImages ? "必要なら画像を生成して images/ に保存" : ""}
-3. **ファイルとして** \`index.html\` を書く（apply_patch / シェル / 適切なツールで）
-4. 完了報告は 1〜2 行だけ
+2. **ファイルとして** \`index.html\` を書く（apply_patch / シェル / 適切なツールで）
+${brief.generateImages ? "3. **ファイルとして** `images.json` を書く（後段で画像が生成される）" : ""}
+${brief.generateImages ? "4" : "3"}. 完了報告は 1〜2 行だけ
 
 # 🚨 もう一度
 

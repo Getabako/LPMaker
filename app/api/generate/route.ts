@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 import { getCodex } from "@/lib/codex/client";
 import { paths, ensureDir, newId } from "@/lib/paths";
 import { buildCodexPrompt, LpBrief } from "@/lib/prompt";
+import { findOpenAIKey } from "@/lib/api-key";
+import { generateImages, ImagesManifest } from "@/lib/images";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +22,14 @@ export async function POST(req: NextRequest) {
   const projectDir = paths.projectDir(id);
   ensureDir(projectDir);
 
-  const prompt = buildCodexPrompt(brief);
+  // API キーが見つからなければ画像生成は自動でオフ
+  const { key: apiKey, source: apiKeySource } = brief.generateImages
+    ? findOpenAIKey()
+    : { key: null, source: null };
+  const willGenerateImages = brief.generateImages && !!apiKey;
+  const effectiveBrief: LpBrief = { ...brief, generateImages: willGenerateImages };
+
+  const prompt = buildCodexPrompt(effectiveBrief);
   const srv = await getCodex();
 
   const encoder = new TextEncoder();
@@ -46,7 +55,12 @@ export async function POST(req: NextRequest) {
       send("init", {
         id,
         projectDir,
-        willGenerateImages: brief.generateImages,
+        willGenerateImages,
+        apiKeySource,
+        imageGenSkippedReason:
+          brief.generateImages && !apiKey
+            ? "OPENAI_API_KEY が見つかりません。~/.env か ~/.lpmaker-data/openai-api-key にキーを置くか、起動時に env で渡してください。"
+            : null,
       });
 
       let threadId: string | null = null;
@@ -232,6 +246,48 @@ export async function POST(req: NextRequest) {
           cleanup();
           closeStream();
           return;
+        }
+
+        // === 画像生成フェーズ（サーバ側で OpenAI Images API を叩く）===
+        if (willGenerateImages && apiKey) {
+          const manifestPath = path.join(projectDir, "images.json");
+          if (fs.existsSync(manifestPath)) {
+            try {
+              const manifest = JSON.parse(
+                fs.readFileSync(manifestPath, "utf8"),
+              ) as ImagesManifest;
+              send("step", {
+                kind: "image",
+                text: `🎨 画像 ${manifest.images.length} 点を ${manifest.model ?? "gpt-image-2"} で生成中…`,
+              });
+              await generateImages(projectDir, manifest, apiKey, (p) => {
+                if (p.type === "image") {
+                  send("step", {
+                    kind: p.status === "ok" ? "image-ok" : "image-err",
+                    text:
+                      p.status === "ok"
+                        ? `✓ ${p.filename}`
+                        : `✗ ${p.filename} - ${p.error?.slice(0, 200)}`,
+                  });
+                } else if (p.type === "done") {
+                  send("step", {
+                    kind: "image",
+                    text: `🎨 画像生成完了: ${p.ok} 成功 / ${p.failed} 失敗`,
+                  });
+                }
+              });
+            } catch (err) {
+              send("step", {
+                kind: "error",
+                text: `images.json の読み込み/生成に失敗: ${(err as Error).message}`,
+              });
+            }
+          } else {
+            send("step", {
+              kind: "image",
+              text: "images.json が無いので画像生成をスキップ",
+            });
+          }
         }
 
         const imagesDir = path.join(projectDir, "images");
