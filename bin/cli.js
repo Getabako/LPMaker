@@ -33,12 +33,6 @@ function pickPort(start) {
   });
 }
 
-function openBrowser(url) {
-  const platform = process.platform;
-  const cmd =
-    platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
-  spawn(cmd, [url], { stdio: "ignore", detached: true, shell: platform === "win32" }).unref();
-}
 
 (async () => {
   if (!(await check("codex"))) {
@@ -61,28 +55,35 @@ function openBrowser(url) {
   const port = await pickPort(Number(process.env.PORT) || 4567);
   const url = `http://localhost:${port}`;
 
-  // Copy required static assets into standalone dir if not already
+  // Always sync static + public into the standalone dir so re-builds
+  // (next build) reliably get picked up.
   const standaloneDir = path.dirname(STANDALONE);
   const staticSrc = path.join(PKG_ROOT, ".next", "static");
   const staticDst = path.join(standaloneDir, ".next", "static");
-  if (fs.existsSync(staticSrc) && !fs.existsSync(staticDst)) {
+  if (fs.existsSync(staticSrc)) {
+    fs.rmSync(staticDst, { recursive: true, force: true });
     fs.mkdirSync(path.dirname(staticDst), { recursive: true });
     fs.cpSync(staticSrc, staticDst, { recursive: true });
   }
   const publicSrc = path.join(PKG_ROOT, "public");
   const publicDst = path.join(standaloneDir, "public");
-  if (fs.existsSync(publicSrc) && !fs.existsSync(publicDst)) {
+  if (fs.existsSync(publicSrc)) {
+    fs.rmSync(publicDst, { recursive: true, force: true });
     fs.cpSync(publicSrc, publicDst, { recursive: true });
   }
 
-  console.log(`▶ Codex Runner starting at ${url}`);
+  console.log("");
+  console.log("=".repeat(56));
+  console.log(`  ▶ LP Maker 起動完了`);
+  console.log(`  ▶ ブラウザで開く:  ${url}`);
+  console.log(`  ▶ 終了するには:    Ctrl+C`);
+  console.log("=".repeat(56));
+  console.log("");
 
   const child = spawn(process.execPath, [STANDALONE], {
     env: { ...process.env, PORT: String(port), HOSTNAME: "127.0.0.1" },
     stdio: "inherit",
   });
-
-  setTimeout(() => openBrowser(url), 800);
 
   const shutdown = () => {
     try {

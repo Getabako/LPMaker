@@ -82,13 +82,17 @@ export async function POST(req: NextRequest) {
           case "thread/status/changed":
             if (params.status?.type) {
               send("step", {
-                kind: "status",
+                kind: params.status.type === "systemError" ? "error" : "status",
                 text: `status: ${params.status.type}${
                   params.status.activeFlags?.length
                     ? " " + params.status.activeFlags.join(",")
                     : ""
                 }`,
               });
+              if (params.status.type === "systemError") {
+                // turn/completed が来なくても抜ける
+                turnDone = true;
+              }
             }
             return;
           case "turn/plan/updated": {
@@ -179,9 +183,12 @@ export async function POST(req: NextRequest) {
       });
 
       try {
-        send("step", { kind: "info", text: "thread/start を送信" });
+        const model = process.env.LPMAKER_MODEL || "gpt-5.5";
+        send("step", { kind: "info", text: `thread/start を送信 (model=${model})` });
         const started: any = await srv.send("thread/start", {
           cwd: projectDir,
+          model,
+          effort: "high",
           sandbox: "workspace-write",
           approvalPolicy: "never",
           serviceName: "lpmaker",
@@ -193,6 +200,8 @@ export async function POST(req: NextRequest) {
           threadId,
           input: [{ type: "text", text: prompt }],
           cwd: projectDir,
+          model,
+          effort: "high",
           sandboxPolicy: {
             type: "workspaceWrite",
             writableRoots: [projectDir],

@@ -105,10 +105,13 @@ export class CodexAppServer extends EventEmitter {
     if (this.initializingPromise) return this.initializingPromise;
 
     this.initializingPromise = (async () => {
+      // Use a known client identity so the backend loads the full agent
+      // toolset (shell / file_change / apply_patch). Unknown clientInfo.name
+      // values can leave the agent in plain-chat mode.
       await this.send("initialize", {
         clientInfo: {
-          name: "codex_runner_local",
-          title: "Codex Runner (local)",
+          name: "codex_cli",
+          title: "LP Maker (codex-cli compatible)",
           version: "0.1.0",
         },
         capabilities: { experimentalApi: true },
