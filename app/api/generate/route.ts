@@ -184,11 +184,12 @@ export async function POST(req: NextRequest) {
 
       try {
         const model = process.env.LPMAKER_MODEL || "gpt-5.5";
-        send("step", { kind: "info", text: `thread/start を送信 (model=${model})` });
+        const effort = process.env.LPMAKER_EFFORT || "medium";
+        send("step", { kind: "info", text: `thread/start を送信 (model=${model}, effort=${effort})` });
         const started: any = await srv.send("thread/start", {
           cwd: projectDir,
           model,
-          effort: "high",
+          effort,
           sandbox: "workspace-write",
           approvalPolicy: "never",
           serviceName: "lpmaker",
@@ -201,7 +202,7 @@ export async function POST(req: NextRequest) {
           input: [{ type: "text", text: prompt }],
           cwd: projectDir,
           model,
-          effort: "high",
+          effort,
           sandboxPolicy: {
             type: "workspaceWrite",
             writableRoots: [projectDir],
