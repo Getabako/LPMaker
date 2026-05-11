@@ -1,65 +1,553 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+type Brief = {
+  brand: string;
+  headline: string;
+  description: string;
+  audience: string;
+  primaryColor: string;
+  accentColor: string;
+  style: string;
+  sections: string[];
+  ctaLabel: string;
+  ctaHref: string;
+  generateImages: boolean;
+};
+
+const STYLES = ["モダン", "ポップ", "ラグジュアリー", "ミニマル", "和風", "サイバー"];
+const SECTION_OPTIONS = [
+  "ヒーロー（ファーストビュー）",
+  "サービスの特徴・強み",
+  "使い方・3 ステップ",
+  "料金プラン",
+  "お客様の声",
+  "よくある質問（FAQ）",
+  "実績・数字",
+  "会社情報",
+  "お問い合わせフォーム",
+];
+
+const INITIAL: Brief = {
+  brand: "",
+  headline: "",
+  description: "",
+  audience: "",
+  primaryColor: "#0ea5e9",
+  accentColor: "#f59e0b",
+  style: "モダン",
+  sections: ["ヒーロー（ファーストビュー）", "サービスの特徴・強み", "料金プラン", "お問い合わせフォーム"],
+  ctaLabel: "今すぐ申し込む",
+  ctaHref: "mailto:info@example.com",
+  generateImages: true,
+};
+
+type Log = { kind: string; text: string; ts: number };
+type Phase = "wizard" | "generating" | "done";
 
 export default function Home() {
+  const [step, setStep] = useState(0);
+  const [brief, setBrief] = useState<Brief>(INITIAL);
+  const [phase, setPhase] = useState<Phase>("wizard");
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [resultId, setResultId] = useState<string | null>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  const append = (kind: string, text: string) =>
+    setLogs((p) => [...p, { kind, text, ts: Date.now() }]);
+
+  const toggleSection = (s: string) => {
+    setBrief((b) => ({
+      ...b,
+      sections: b.sections.includes(s)
+        ? b.sections.filter((x) => x !== s)
+        : [...b.sections, s],
+    }));
+  };
+
+  const next = () => setStep((s) => Math.min(s + 1, 2));
+  const prev = () => setStep((s) => Math.max(s - 1, 0));
+
+  const startGenerate = async () => {
+    setPhase("generating");
+    setLogs([]);
+    setResultId(null);
+    append("info", "▶ Codex に LP 生成を依頼…");
+
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brief }),
+    });
+
+    if (!res.body) {
+      append("error", "通信に失敗しました");
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const raw = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let ev = "message";
+        let data = "";
+        for (const line of raw.split("\n")) {
+          if (line.startsWith("event: ")) ev = line.slice(7).trim();
+          else if (line.startsWith("data: ")) data += line.slice(6);
+        }
+        if (!data) continue;
+        try {
+          handleEvent(ev, JSON.parse(data));
+        } catch {
+          append("raw", data);
+        }
+      }
+    }
+  };
+
+  const handleEvent = (ev: string, data: any) => {
+    switch (ev) {
+      case "init":
+        append("info", `生成 ID: ${data.id} ${data.willGenerateImages ? "(画像生成あり)" : "(画像生成なし)"}`);
+        break;
+      case "phase":
+        append("phase", `▸ ${data.message}`);
+        break;
+      case "step":
+        append(data.kind || "step", data.text);
+        break;
+      case "agent":
+        if (data.text) append("agent", `🤖 ${data.text}`);
+        break;
+      case "image_progress":
+        if (data.type === "start") append("image", `画像 ${data.total} 点の生成を開始`);
+        else if (data.type === "image")
+          append(
+            data.status === "ok" ? "image-ok" : "image-err",
+            `${data.status === "ok" ? "✓" : "✗"} ${data.filename}${data.error ? " - " + data.error : ""}`,
+          );
+        else if (data.type === "done")
+          append("image", `画像完了: ${data.ok} 成功 / ${data.failed} 失敗`);
+        break;
+      case "done":
+        setResultId(data.id);
+        setPhase("done");
+        append("done", "🎉 LP 完成！");
+        break;
+      case "error":
+        append("error", data.message ?? JSON.stringify(data));
+        break;
+    }
+  };
+
+  const reset = () => {
+    setPhase("wizard");
+    setStep(0);
+    setLogs([]);
+    setResultId(null);
+  };
+
+  if (phase === "done" && resultId) {
+    return <ResultView id={resultId} onReset={reset} />;
+  }
+  if (phase === "generating") {
+    return <GeneratingView logs={logs} logEndRef={logEndRef} />;
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-zinc-100">
+      <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
+        <header className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">
+            ✨ LP Maker
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-zinc-400 text-sm">
+            いくつかの質問に答えると、Codex がリッチな LP を作って画像まで差し込みます。
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        </header>
+
+        <Stepper step={step} />
+
+        {step === 0 && <Step1 brief={brief} setBrief={setBrief} />}
+        {step === 1 && (
+          <Step2 brief={brief} setBrief={setBrief} toggleSection={toggleSection} />
+        )}
+        {step === 2 && <Step3 brief={brief} setBrief={setBrief} />}
+
+        <div className="flex justify-between pt-4">
+          <button
+            disabled={step === 0}
+            onClick={prev}
+            className="px-4 py-2 rounded-md text-sm bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            ← 戻る
+          </button>
+          {step < 2 ? (
+            <button
+              onClick={next}
+              disabled={step === 0 && (!brief.brand.trim() || !brief.headline.trim())}
+              className="px-5 py-2 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
+            >
+              次へ →
+            </button>
+          ) : (
+            <button
+              onClick={startGenerate}
+              disabled={brief.sections.length === 0}
+              className="px-5 py-2 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
+            >
+              ▶ LP を生成する
+            </button>
+          )}
         </div>
-      </main>
+      </div>
+    </main>
+  );
+}
+
+function Stepper({ step }: { step: number }) {
+  const labels = ["基本情報", "デザイン・構成", "CTA・画像生成"];
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      {labels.map((l, i) => (
+        <div key={i} className="flex items-center gap-2 flex-1">
+          <div
+            className={`flex items-center justify-center w-6 h-6 rounded-full border ${
+              i <= step
+                ? "bg-emerald-600 border-emerald-500 text-white"
+                : "border-zinc-700 text-zinc-500"
+            }`}
+          >
+            {i + 1}
+          </div>
+          <span className={i === step ? "text-zinc-100" : "text-zinc-500"}>
+            {l}
+          </span>
+          {i < labels.length - 1 && (
+            <div className="flex-1 h-px bg-zinc-800" />
+          )}
+        </div>
+      ))}
     </div>
   );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="block text-sm font-medium">{label}</span>
+      {hint && <span className="block text-xs text-zinc-500">{hint}</span>}
+      {children}
+    </label>
+  );
+}
+
+const inputCls =
+  "w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500";
+
+function Step1({
+  brief,
+  setBrief,
+}: {
+  brief: Brief;
+  setBrief: React.Dispatch<React.SetStateAction<Brief>>;
+}) {
+  return (
+    <section className="space-y-5">
+      <Field label="ブランド名 / サービス名" hint="ページのタイトルに使います">
+        <input
+          className={inputCls}
+          value={brief.brand}
+          onChange={(e) => setBrief({ ...brief, brand: e.target.value })}
+          placeholder="例: SunRise Coffee"
+        />
+      </Field>
+      <Field label="キャッチコピー（1 行）" hint="ファーストビューに大きく出ます">
+        <input
+          className={inputCls}
+          value={brief.headline}
+          onChange={(e) => setBrief({ ...brief, headline: e.target.value })}
+          placeholder="例: 朝の 15 分を、最高の一杯から"
+        />
+      </Field>
+      <Field label="サービス・商品の説明" hint="数行で OK。読者に何を提供するか">
+        <textarea
+          className={inputCls}
+          rows={4}
+          value={brief.description}
+          onChange={(e) => setBrief({ ...brief, description: e.target.value })}
+          placeholder="例: 産地直送のスペシャルティ豆を、自宅でハンドドリップ品質で淹れられるサブスクリプションサービスです。"
+        />
+      </Field>
+      <Field label="ターゲット（誰に向けたページ？）">
+        <input
+          className={inputCls}
+          value={brief.audience}
+          onChange={(e) => setBrief({ ...brief, audience: e.target.value })}
+          placeholder="例: 自宅で本格コーヒーを楽しみたい 30 代会社員"
+        />
+      </Field>
+    </section>
+  );
+}
+
+function Step2({
+  brief,
+  setBrief,
+  toggleSection,
+}: {
+  brief: Brief;
+  setBrief: React.Dispatch<React.SetStateAction<Brief>>;
+  toggleSection: (s: string) => void;
+}) {
+  return (
+    <section className="space-y-5">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="メインカラー">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={brief.primaryColor}
+              onChange={(e) =>
+                setBrief({ ...brief, primaryColor: e.target.value })
+              }
+              className="h-10 w-12 rounded border border-zinc-800 bg-zinc-900"
+            />
+            <input
+              className={inputCls}
+              value={brief.primaryColor}
+              onChange={(e) =>
+                setBrief({ ...brief, primaryColor: e.target.value })
+              }
+            />
+          </div>
+        </Field>
+        <Field label="アクセントカラー">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={brief.accentColor}
+              onChange={(e) =>
+                setBrief({ ...brief, accentColor: e.target.value })
+              }
+              className="h-10 w-12 rounded border border-zinc-800 bg-zinc-900"
+            />
+            <input
+              className={inputCls}
+              value={brief.accentColor}
+              onChange={(e) =>
+                setBrief({ ...brief, accentColor: e.target.value })
+              }
+            />
+          </div>
+        </Field>
+      </div>
+
+      <Field label="デザインスタイル">
+        <div className="grid grid-cols-3 gap-2">
+          {STYLES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setBrief({ ...brief, style: s })}
+              className={`text-sm px-3 py-2 rounded-md border ${
+                brief.style === s
+                  ? "bg-emerald-600 border-emerald-500"
+                  : "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field
+        label="掲載するセクション"
+        hint="チェックを入れた順番ではなく、デザインに合った順序で生成されます"
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {SECTION_OPTIONS.map((s) => (
+            <label
+              key={s}
+              className={`flex items-center gap-2 text-sm px-3 py-2 rounded-md border cursor-pointer ${
+                brief.sections.includes(s)
+                  ? "bg-emerald-900/30 border-emerald-700"
+                  : "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={brief.sections.includes(s)}
+                onChange={() => toggleSection(s)}
+                className="accent-emerald-500"
+              />
+              {s}
+            </label>
+          ))}
+        </div>
+      </Field>
+    </section>
+  );
+}
+
+function Step3({
+  brief,
+  setBrief,
+}: {
+  brief: Brief;
+  setBrief: React.Dispatch<React.SetStateAction<Brief>>;
+}) {
+  return (
+    <section className="space-y-5">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="CTA ボタンの文言">
+          <input
+            className={inputCls}
+            value={brief.ctaLabel}
+            onChange={(e) =>
+              setBrief({ ...brief, ctaLabel: e.target.value })
+            }
+          />
+        </Field>
+        <Field label="CTA のリンク先" hint="URL または mailto:">
+          <input
+            className={inputCls}
+            value={brief.ctaHref}
+            onChange={(e) => setBrief({ ...brief, ctaHref: e.target.value })}
+          />
+        </Field>
+      </div>
+
+      <Field
+        label="画像生成"
+        hint="Codex があなたの ChatGPT サブスク権限内で画像を作って images/ に保存します。外部 API キー不要。"
+      >
+        <label className="flex items-center gap-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={brief.generateImages}
+            onChange={(e) =>
+              setBrief({ ...brief, generateImages: e.target.checked })
+            }
+            className="accent-emerald-500"
+          />
+          画像を生成して LP に差し込む
+        </label>
+      </Field>
+    </section>
+  );
+}
+
+function GeneratingView({
+  logs,
+  logEndRef,
+}: {
+  logs: Log[];
+  logEndRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="max-w-3xl mx-auto px-6 py-12 space-y-6">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+          生成中…
+        </h1>
+        <p className="text-sm text-zinc-400">
+          Codex が HTML を書いてから、画像を差し込みます。1〜3 分かかります。
+        </p>
+        <div className="bg-black border border-zinc-800 rounded-md p-4 h-[500px] overflow-y-auto font-mono text-xs space-y-1">
+          {logs.map((l, i) => (
+            <div key={i} className={kindClass(l.kind)}>
+              <span className="text-zinc-600">
+                {new Date(l.ts).toLocaleTimeString()}
+              </span>{" "}
+              {l.text}
+            </div>
+          ))}
+          <div ref={logEndRef} />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
+        <h1 className="font-bold">🎉 LP 完成</h1>
+        <div className="flex gap-2">
+          <a
+            href={`/api/download/${id}`}
+            className="text-sm bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded"
+          >
+            ⬇ ZIP ダウンロード
+          </a>
+          <a
+            href={`/api/preview/${id}/index.html`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded"
+          >
+            ↗ 新しいタブで開く
+          </a>
+          <button
+            onClick={onReset}
+            className="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded"
+          >
+            もう一度作る
+          </button>
+        </div>
+      </header>
+      <iframe
+        src={`/api/preview/${id}/index.html`}
+        className="flex-1 w-full bg-white"
+        title="LP Preview"
+      />
+    </main>
+  );
+}
+
+function kindClass(k: string) {
+  switch (k) {
+    case "error":
+    case "image-err":
+      return "text-red-400";
+    case "done":
+      return "text-emerald-400 font-semibold";
+    case "info":
+    case "phase":
+      return "text-sky-400";
+    case "agent":
+      return "text-zinc-100 whitespace-pre-wrap";
+    case "image":
+    case "image-ok":
+      return "text-amber-300";
+    case "command":
+      return "text-zinc-300";
+    case "file":
+      return "text-purple-300";
+    default:
+      return "text-zinc-500";
+  }
 }
