@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codex Runner",
-  description: "Codex App Server backed web client",
+  title: "LP Maker",
+  description: "AI で LP を自動生成するローカルツール",
 };
 
 export default function RootLayout({

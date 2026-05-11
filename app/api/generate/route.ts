@@ -36,7 +36,11 @@ export async function POST(req: NextRequest) {
         } catch {}
       };
 
-      send("init", { id, projectDir });
+      send("init", {
+        id,
+        projectDir,
+        willGenerateImages: brief.generateImages,
+      });
 
       let threadId: string | null = null;
       let turnId: string | null = null;
@@ -117,7 +121,7 @@ export async function POST(req: NextRequest) {
           input: [{ type: "text", text: prompt }],
           cwd: projectDir,
           sandboxPolicy: {
-            type: "workspace-write",
+            type: "workspaceWrite",
             writableRoots: [projectDir],
             networkAccess: true,
           },
