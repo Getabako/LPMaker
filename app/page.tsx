@@ -119,10 +119,27 @@ export default function Home() {
   const handleEvent = (ev: string, data: any) => {
     switch (ev) {
       case "init":
-        append("info", `生成 ID: ${data.id} ${data.willGenerateImages ? "(画像生成あり)" : "(画像生成なし)"}`);
+        append(
+          "info",
+          `生成 ID: ${data.id} ${data.willGenerateImages ? "(画像生成あり)" : "(画像生成なし)"}`,
+        );
         break;
-      case "phase":
-        append("phase", `▸ ${data.message}`);
+      case "heartbeat":
+        // 既存ハートビート行があれば置き換え、無ければ追加
+        setLogs((p) => {
+          const idx = p.findIndex((l) => l.kind === "heartbeat");
+          const entry: Log = {
+            kind: "heartbeat",
+            text: `⏱ Codex 稼働中… ${data.elapsedSec} 秒経過`,
+            ts: Date.now(),
+          };
+          if (idx >= 0) {
+            const c = [...p];
+            c[idx] = entry;
+            return c;
+          }
+          return [...p, entry];
+        });
         break;
       case "step":
         append(data.kind || "step", data.text);
@@ -130,15 +147,34 @@ export default function Home() {
       case "agent":
         if (data.text) append("agent", `🤖 ${data.text}`);
         break;
-      case "image_progress":
-        if (data.type === "start") append("image", `画像 ${data.total} 点の生成を開始`);
-        else if (data.type === "image")
-          append(
-            data.status === "ok" ? "image-ok" : "image-err",
-            `${data.status === "ok" ? "✓" : "✗"} ${data.filename}${data.error ? " - " + data.error : ""}`,
-          );
-        else if (data.type === "done")
-          append("image", `画像完了: ${data.ok} 成功 / ${data.failed} 失敗`);
+      case "delta":
+        // agent message 途中経過。連続してくるので末尾の delta 行に append する
+        setLogs((p) => {
+          const last = p[p.length - 1];
+          if (last && last.kind === "agent-delta") {
+            const c = [...p];
+            c[c.length - 1] = { ...last, text: last.text + (data.text ?? "") };
+            return c;
+          }
+          return [...p, { kind: "agent-delta", text: data.text ?? "", ts: Date.now() }];
+        });
+        break;
+      case "reasoning_delta":
+        setLogs((p) => {
+          const last = p[p.length - 1];
+          if (last && last.kind === "reasoning-stream") {
+            const c = [...p];
+            c[c.length - 1] = { ...last, text: last.text + (data.text ?? "") };
+            return c;
+          }
+          return [...p, { kind: "reasoning-stream", text: "🧠 " + (data.text ?? ""), ts: Date.now() }];
+        });
+        break;
+      case "cmd_output":
+        append("cmd-out", data.text ?? "");
+        break;
+      case "stderr":
+        append("stderr", data.text ?? "");
         break;
       case "done":
         setResultId(data.id);
@@ -531,22 +567,37 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
 function kindClass(k: string) {
   switch (k) {
     case "error":
-    case "image-err":
+    case "command-err":
+    case "stderr":
       return "text-red-400";
     case "done":
       return "text-emerald-400 font-semibold";
     case "info":
-    case "phase":
+    case "thread":
+    case "turn":
+    case "status":
       return "text-sky-400";
     case "agent":
+    case "agent-delta":
       return "text-zinc-100 whitespace-pre-wrap";
-    case "image":
-    case "image-ok":
-      return "text-amber-300";
     case "command":
+    case "command-ok":
       return "text-zinc-300";
+    case "cmd-out":
+      return "text-zinc-500 whitespace-pre-wrap";
     case "file":
+    case "file-ok":
       return "text-purple-300";
+    case "reasoning":
+    case "reasoning-stream":
+      return "text-amber-200/70 italic";
+    case "plan":
+      return "text-emerald-300";
+    case "web":
+    case "tool":
+      return "text-cyan-300";
+    case "heartbeat":
+      return "text-zinc-600";
     default:
       return "text-zinc-500";
   }

@@ -26,7 +26,9 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
       const send = (event: string, data: unknown) => {
+        if (closed) return;
         try {
           controller.enqueue(
             encoder.encode(
@@ -34,6 +36,11 @@ export async function POST(req: NextRequest) {
             ),
           );
         } catch {}
+      };
+      const closeStream = () => {
+        if (closed) return;
+        closed = true;
+        try { controller.close(); } catch {}
       };
 
       send("init", {
@@ -45,69 +52,134 @@ export async function POST(req: NextRequest) {
       let threadId: string | null = null;
       let turnId: string | null = null;
       let turnDone = false;
+      const startedAt = Date.now();
+
+      // ハートビート（黙りこむのを防ぐ）
+      const heartbeat = setInterval(() => {
+        const sec = Math.floor((Date.now() - startedAt) / 1000);
+        send("heartbeat", { elapsedSec: sec });
+      }, 3000);
+
+      const onStderr = (text: string) => {
+        const t = text.trim();
+        if (t) send("stderr", { text: t.slice(0, 500) });
+      };
+      srv.on("stderr", onStderr);
 
       const onNotif = (notif: any) => {
         const { method, params } = notif;
         if (!params) return;
 
-        if (method === "thread/started") {
-          threadId = params.thread?.id;
-          send("phase", { message: "Codex が制作を開始しました" });
-          return;
-        }
-        if (method === "item/started") {
-          const item = params.item;
-          if (!item) return;
-          if (item.type === "agentMessage") {
-            // delta が流れてくる
-          } else if (item.type === "commandExecution") {
-            const cmd = Array.isArray(item.command)
-              ? item.command.join(" ")
-              : String(item.command ?? "");
-            send("step", { kind: "command", text: `$ ${cmd.slice(0, 200)}` });
-          } else if (item.type === "fileChange") {
-            const files = (item.changes || []).map((c: any) => c.path).join(", ");
-            send("step", { kind: "file", text: `📄 ${files}` });
-          } else if (item.type === "reasoning") {
-            // 騒がしいのでスキップ
-          } else {
-            send("step", { kind: "info", text: `▸ ${item.type}` });
+        // すべてのイベントを生で送るのは多すぎるので、見せたいものだけ整形
+        switch (method) {
+          case "thread/started":
+            threadId = params.thread?.id;
+            send("step", { kind: "thread", text: `🧵 thread: ${threadId}` });
+            return;
+          case "turn/started":
+            send("step", { kind: "turn", text: `▶ turn 開始` });
+            return;
+          case "thread/status/changed":
+            if (params.status?.type) {
+              send("step", {
+                kind: "status",
+                text: `status: ${params.status.type}${
+                  params.status.activeFlags?.length
+                    ? " " + params.status.activeFlags.join(",")
+                    : ""
+                }`,
+              });
+            }
+            return;
+          case "turn/plan/updated": {
+            const plan = (params.plan ?? []) as Array<{
+              step: string;
+              status: string;
+            }>;
+            const summary = plan
+              .map((p) => `${p.status === "completed" ? "✓" : p.status === "inProgress" ? "▸" : "·"} ${p.step}`)
+              .join(" / ");
+            if (summary) send("step", { kind: "plan", text: `📋 ${summary}` });
+            return;
           }
-          return;
-        }
-        if (method === "item/agentMessage/delta") {
-          send("delta", { text: params.delta ?? "" });
-          return;
-        }
-        if (method === "item/completed") {
-          const item = params.item;
-          if (item?.type === "agentMessage" && item.text) {
-            send("agent", { text: item.text });
-          } else if (item?.type === "commandExecution") {
-            send("step", {
-              kind: item.exitCode === 0 ? "command-ok" : "command-err",
-              text: `↳ exit ${item.exitCode}`,
-            });
+          case "thread/tokenUsage/updated":
+            // 騒がしいので 30 秒ごとに送る
+            return;
+          case "item/started": {
+            const item = params.item;
+            if (!item) return;
+            if (item.type === "agentMessage") return; // delta で流れる
+            if (item.type === "reasoning") {
+              send("step", { kind: "reasoning", text: "🧠 思考中…" });
+            } else if (item.type === "commandExecution") {
+              const cmd = Array.isArray(item.command)
+                ? item.command.join(" ")
+                : String(item.command ?? "");
+              send("step", { kind: "command", text: `$ ${cmd.slice(0, 200)}` });
+            } else if (item.type === "fileChange") {
+              const files = (item.changes || []).map((c: any) => c.path).join(", ");
+              send("step", { kind: "file", text: `📄 編集: ${files}` });
+            } else if (item.type === "webSearch") {
+              send("step", { kind: "web", text: `🔎 web search: ${item.query ?? ""}` });
+            } else if (item.type === "mcpToolCall") {
+              send("step", { kind: "tool", text: `🛠 ${item.server}/${item.tool}` });
+            } else if (item.type === "dynamicToolCall") {
+              send("step", { kind: "tool", text: `🛠 ${item.tool}` });
+            } else {
+              send("step", { kind: "info", text: `▸ ${item.type}` });
+            }
+            return;
           }
-          return;
-        }
-        if (method === "turn/completed") {
-          turnDone = true;
+          case "item/agentMessage/delta":
+            send("delta", { text: params.delta ?? "" });
+            return;
+          case "item/reasoning/summaryTextDelta":
+            // 思考の要約は少しずつ見せる
+            send("reasoning_delta", { text: params.delta ?? "" });
+            return;
+          case "item/commandExecution/outputDelta":
+            send("cmd_output", { text: String(params.chunk ?? params.output ?? "").slice(0, 200) });
+            return;
+          case "item/completed": {
+            const item = params.item;
+            if (!item) return;
+            if (item.type === "agentMessage" && item.text) {
+              send("agent", { text: item.text });
+            } else if (item.type === "commandExecution") {
+              send("step", {
+                kind: item.exitCode === 0 ? "command-ok" : "command-err",
+                text: `↳ exit ${item.exitCode}`,
+              });
+            } else if (item.type === "fileChange") {
+              const files = (item.changes || []).map((c: any) => c.path).join(", ");
+              send("step", { kind: "file-ok", text: `✓ 書き込み完了: ${files}` });
+            }
+            return;
+          }
+          case "turn/completed":
+            turnDone = true;
+            return;
         }
       };
 
       srv.on("notification", onNotif);
-      const cleanup = () => srv.off("notification", onNotif);
+
+      const cleanup = () => {
+        clearInterval(heartbeat);
+        srv.off("notification", onNotif);
+        srv.off("stderr", onStderr);
+      };
 
       req.signal.addEventListener("abort", () => {
         if (threadId && turnId) {
           srv.send("turn/interrupt", { threadId, turnId }).catch(() => {});
         }
         cleanup();
-        try { controller.close(); } catch {}
+        closeStream();
       });
 
       try {
+        send("step", { kind: "info", text: "thread/start を送信" });
         const started: any = await srv.send("thread/start", {
           cwd: projectDir,
           sandbox: "workspace-write",
@@ -116,6 +188,7 @@ export async function POST(req: NextRequest) {
         });
         threadId = started.thread.id;
 
+        send("step", { kind: "info", text: "turn/start を送信" });
         const turn: any = await srv.send("turn/start", {
           threadId,
           input: [{ type: "text", text: prompt }],
@@ -128,7 +201,7 @@ export async function POST(req: NextRequest) {
           approvalPolicy: "never",
         });
         turnId = turn.turn.id;
-        send("turn_started", { threadId, turnId });
+        send("step", { kind: "turn", text: `▶ turn: ${turnId}` });
 
         await new Promise<void>((resolve) => {
           const tick = setInterval(() => {
@@ -145,29 +218,28 @@ export async function POST(req: NextRequest) {
 
         const indexPath = path.join(projectDir, "index.html");
         if (!fs.existsSync(indexPath)) {
-          send("error", { message: "index.html が生成されませんでした" });
+          send("error", { message: "index.html が生成されませんでした（Codex の出力を確認してください）" });
           cleanup();
-          try { controller.close(); } catch {}
+          closeStream();
           return;
         }
 
-        // 画像枚数のレポート
         const imagesDir = path.join(projectDir, "images");
         const imageCount = fs.existsSync(imagesDir)
           ? fs.readdirSync(imagesDir).filter((f) =>
               /\.(png|jpe?g|webp|gif|svg)$/i.test(f),
             ).length
           : 0;
-        send("phase", {
-          message: `✅ 完成（画像 ${imageCount} 点）`,
+        send("step", {
+          kind: "done",
+          text: `🎉 完成: index.html ${(fs.statSync(indexPath).size / 1024).toFixed(1)} KB, 画像 ${imageCount} 点`,
         });
-
         send("done", { id, previewUrl: `/api/preview/${id}/index.html` });
       } catch (err) {
         send("error", { message: (err as Error).message });
       } finally {
         cleanup();
-        try { controller.close(); } catch {}
+        closeStream();
       }
     },
   });
