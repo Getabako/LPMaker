@@ -22,7 +22,10 @@ cyan "▶ Codex Runner セットアップを開始します"
 
 # 1. OS チェック
 if [[ "$(uname)" != "Darwin" ]]; then
-  red "✗ いまは Mac (macOS) 専用です。"
+  red "✗ install.sh は macOS 向けです。"
+  red ""
+  red "Windows の方は PowerShell を開いて以下の 1 行を実行してください:"
+  red "  iwr -useb https://raw.githubusercontent.com/$GH_REPO/main/install.ps1 | iex"
   exit 1
 fi
 

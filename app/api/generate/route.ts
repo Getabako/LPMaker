@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
   const id = newId();
   const projectDir = paths.projectDir(id);
   ensureDir(projectDir);
+  // 後段の /api/publish などが参照できるよう brief を保存
+  fs.writeFileSync(
+    path.join(projectDir, "_brief.json"),
+    JSON.stringify(brief, null, 2),
+  );
 
   const prompt = buildCodexPrompt(brief);
   const srv = await getCodex();

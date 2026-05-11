@@ -528,6 +528,60 @@ function GeneratingView({
 }
 
 function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [repoName, setRepoName] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [publishLogs, setPublishLogs] = useState<Log[]>([]);
+  const [result, setResult] = useState<{ repo: string; pagesUrl: string; note?: string } | null>(null);
+
+  const publish = async () => {
+    setPublishing(true);
+    setPublishLogs([]);
+    setResult(null);
+    const res = await fetch("/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, repoName: repoName.trim() || undefined }),
+    });
+    if (!res.body) {
+      setPublishLogs((p) => [...p, { kind: "error", text: "通信失敗", ts: Date.now() }]);
+      setPublishing(false);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const raw = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let ev = "message";
+        let dataStr = "";
+        for (const line of raw.split("\n")) {
+          if (line.startsWith("event: ")) ev = line.slice(7).trim();
+          else if (line.startsWith("data: ")) dataStr += line.slice(6);
+        }
+        if (!dataStr) continue;
+        try {
+          const data = JSON.parse(dataStr);
+          if (ev === "step") {
+            setPublishLogs((p) => [...p, { kind: "step", text: data.text, ts: Date.now() }]);
+          } else if (ev === "error") {
+            setPublishLogs((p) => [...p, { kind: "error", text: data.message, ts: Date.now() }]);
+          } else if (ev === "done") {
+            setResult({ repo: data.repo, pagesUrl: data.pagesUrl, note: data.note });
+            setPublishLogs((p) => [...p, { kind: "done", text: `✓ ${data.pagesUrl}`, ts: Date.now() }]);
+          }
+        } catch {}
+      }
+    }
+    setPublishing(false);
+  };
+
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
       <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
@@ -539,6 +593,12 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
           >
             ⬇ ZIP ダウンロード
           </a>
+          <button
+            onClick={() => setPublishOpen((v) => !v)}
+            className="text-sm bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded"
+          >
+            🌐 GitHub Pages に公開
+          </button>
           <a
             href={`/api/preview/${id}/index.html`}
             target="_blank"
@@ -555,6 +615,66 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
           </button>
         </div>
       </header>
+
+      {publishOpen && (
+        <section className="border-b border-zinc-800 px-6 py-4 bg-zinc-900/60 space-y-3">
+          {!result && !publishing && (
+            <div className="flex items-end gap-2 max-w-2xl">
+              <label className="flex-1 space-y-1">
+                <span className="text-xs text-zinc-400">リポジトリ名（空欄でブランド名から自動）</span>
+                <input
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm font-mono"
+                  value={repoName}
+                  onChange={(e) => setRepoName(e.target.value)}
+                  placeholder="例: lp-cafe-lumiere"
+                />
+              </label>
+              <button
+                onClick={publish}
+                className="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded text-sm font-medium"
+              >
+                ▶ 公開する
+              </button>
+            </div>
+          )}
+          {(publishing || publishLogs.length > 0) && (
+            <div className="bg-black border border-zinc-800 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1">
+              {publishLogs.map((l, i) => (
+                <div
+                  key={i}
+                  className={
+                    l.kind === "error"
+                      ? "text-red-400"
+                      : l.kind === "done"
+                      ? "text-emerald-400 font-semibold"
+                      : "text-zinc-300"
+                  }
+                >
+                  {l.text}
+                </div>
+              ))}
+            </div>
+          )}
+          {result && (
+            <div className="bg-emerald-950/40 border border-emerald-700 rounded-md p-3 text-sm space-y-1">
+              <div>
+                🌐 公開 URL:{" "}
+                <a className="text-emerald-300 underline" href={result.pagesUrl} target="_blank" rel="noreferrer">
+                  {result.pagesUrl}
+                </a>
+              </div>
+              <div className="text-xs text-zinc-400">
+                📦 リポジトリ:{" "}
+                <a className="text-sky-300 underline" href={result.repo} target="_blank" rel="noreferrer">
+                  {result.repo}
+                </a>
+              </div>
+              {result.note && <div className="text-xs text-amber-300">{result.note}</div>}
+            </div>
+          )}
+        </section>
+      )}
+
       <iframe
         src={`/api/preview/${id}/index.html`}
         className="flex-1 w-full bg-white"
