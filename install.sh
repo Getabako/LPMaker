@@ -65,12 +65,19 @@ fi
 
 cd "$INSTALL_DIR"
 
-# 7. 依存と本番ビルド（変更があれば再ビルド）
+# 7. 依存と本番ビルド（コミットが変わった or 成果物が無いなら再ビルド）
+CUR_SHA="$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+MARK_FILE="$INSTALL_DIR/.next/.built-sha"
+LAST_SHA=""
+[[ -f "$MARK_FILE" ]] && LAST_SHA="$(cat "$MARK_FILE" 2>/dev/null || echo)"
+
 NEED_BUILD=0
-if [[ ! -d node_modules ]]; then NEED_BUILD=1; fi
-if [[ ! -f .next/standalone/server.js ]]; then NEED_BUILD=1; fi
+[[ ! -d node_modules ]] && NEED_BUILD=1
+[[ ! -f .next/standalone/server.js ]] && NEED_BUILD=1
+[[ "$CUR_SHA" != "$LAST_SHA" ]] && NEED_BUILD=1
+
 if [[ "$NEED_BUILD" -eq 1 ]]; then
-  cyan "▶ アプリを準備中（初回 or 更新時のみ）"
+  cyan "▶ アプリを準備中（初回 or 更新があった時のみ・30 秒〜1 分）"
   if command -v pnpm >/dev/null 2>&1; then
     pnpm install --silent
     pnpm build >/dev/null
@@ -78,6 +85,8 @@ if [[ "$NEED_BUILD" -eq 1 ]]; then
     npm install --silent
     npm run build >/dev/null
   fi
+  mkdir -p "$INSTALL_DIR/.next"
+  echo "$CUR_SHA" > "$MARK_FILE"
 fi
 
 # 8. ChatGPT へのログイン状態を確認（必要なら本人にやってもらう）
