@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type HeroMode = "static" | "slider" | "video" | "gradient";
+
 type Brief = {
   brand: string;
   headline: string;
@@ -10,15 +12,42 @@ type Brief = {
   primaryColor: string;
   accentColor: string;
   style: string;
+  styleCustom: string;
   sections: string[];
+  sectionsCustom: string;
   ctaLabel: string;
   ctaHref: string;
   generateImages: boolean;
   customInstructions: string;
   characterRefPaths: string[];
+  heroMode: HeroMode;
+  heroVideoUrl: string;
+  heroSliderUrls: string;
+  embedMapUrl: string;
+  embedVideoUrls: string;
+  embedSocialUrls: string;
+  embedCustomHtml: string;
 };
 
-const STYLES = ["モダン", "ポップ", "ラグジュアリー", "ミニマル", "和風", "サイバー"];
+const STYLES = [
+  "モダン",
+  "ポップ",
+  "ラグジュアリー",
+  "ミニマル",
+  "和風",
+  "サイバー",
+  "ナチュラル",
+  "レトロ",
+  "ブルータリスト",
+  "グラスモーフィズム",
+  "ニューモーフィズム",
+  "ダークモード",
+  "パステル",
+  "コーポレート",
+  "手書き / ZINE",
+  "エディトリアル雑誌風",
+];
+
 const SECTION_OPTIONS = [
   "ヒーロー（ファーストビュー）",
   "サービスの特徴・強み",
@@ -29,6 +58,23 @@ const SECTION_OPTIONS = [
   "実績・数字",
   "会社情報",
   "お問い合わせフォーム",
+  "ギャラリー / 写真一覧",
+  "ニュース / 更新情報",
+  "メンバー / 講師紹介",
+  "比較表",
+  "導入事例 / 制作実績",
+  "ロードマップ / 開発予定",
+  "メディア掲載",
+  "受賞歴 / 認定",
+  "ダウンロード資料",
+  "アクセス / 地図",
+  "イベント / セミナー予定",
+  "採用情報",
+  "メルマガ / LINE 登録",
+  "SNS フィード",
+  "動画埋め込み（YouTube 等）",
+  "ブログ / コラム一覧",
+  "パートナー / スポンサー",
 ];
 
 const INITIAL: Brief = {
@@ -39,12 +85,21 @@ const INITIAL: Brief = {
   primaryColor: "#0ea5e9",
   accentColor: "#f59e0b",
   style: "モダン",
+  styleCustom: "",
   sections: ["ヒーロー（ファーストビュー）", "サービスの特徴・強み", "料金プラン", "お問い合わせフォーム"],
+  sectionsCustom: "",
   ctaLabel: "今すぐ申し込む",
   ctaHref: "mailto:info@example.com",
   generateImages: true,
   customInstructions: "",
   characterRefPaths: [],
+  heroMode: "static",
+  heroVideoUrl: "",
+  heroSliderUrls: "",
+  embedMapUrl: "",
+  embedVideoUrls: "",
+  embedSocialUrls: "",
+  embedCustomHtml: "",
 };
 
 type Log = { kind: string; text: string; ts: number };
@@ -256,7 +311,7 @@ export default function Home() {
           <button
             disabled={step === 0}
             onClick={prev}
-            className="px-6 py-3 rounded-full text-base bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            className="px-7 py-3.5 rounded-full text-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
             戻る
           </button>
@@ -264,7 +319,7 @@ export default function Home() {
             <button
               onClick={next}
               disabled={step === 0 && (!brief.brand.trim() || !brief.headline.trim())}
-              className="px-7 py-3 rounded-full text-base font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-stone-300 disabled:to-stone-300 disabled:text-stone-500 shadow-md"
+              className="px-8 py-3.5 rounded-full text-lg font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-stone-300 disabled:to-stone-300 disabled:text-stone-500 shadow-md"
             >
               次へ
             </button>
@@ -272,7 +327,7 @@ export default function Home() {
             <button
               onClick={startGenerate}
               disabled={brief.sections.length === 0}
-              className="px-7 py-3 rounded-full text-base font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-stone-300 disabled:to-stone-300 disabled:text-stone-500 shadow-md"
+              className="px-8 py-3.5 rounded-full text-lg font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-stone-300 disabled:to-stone-300 disabled:text-stone-500 shadow-md"
             >
               LP を生成する
             </button>
@@ -313,10 +368,10 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) 
         draggable={false}
       />
       <div>
-        <h1 className="text-2xl font-bold tracking-wide text-orange-600">
+        <h1 className="text-3xl font-bold tracking-wide text-orange-600">
           {title}
         </h1>
-        <p className="text-sm text-stone-500 leading-relaxed">{subtitle}</p>
+        <p className="text-base text-stone-500 leading-relaxed">{subtitle}</p>
       </div>
     </div>
   );
@@ -337,7 +392,7 @@ function Stepper({ step }: { step: number }) {
           >
             {i + 1}
           </div>
-          <span className={`text-base font-medium ${i === step ? "text-stone-800" : "text-stone-400"}`}>
+          <span className={`text-lg font-medium ${i === step ? "text-stone-800" : "text-stone-400"}`}>
             {l}
           </span>
           {i < labels.length - 1 && (
@@ -360,15 +415,15 @@ function Field({
 }) {
   return (
     <label className="block space-y-2">
-      <span className="block text-base font-semibold tracking-wide text-stone-800">{label}</span>
-      {hint && <span className="block text-sm text-stone-500 leading-relaxed">{hint}</span>}
+      <span className="block text-lg font-semibold tracking-wide text-stone-800">{label}</span>
+      {hint && <span className="block text-base text-stone-500 leading-relaxed">{hint}</span>}
       {children}
     </label>
   );
 }
 
 const inputCls =
-  "w-full bg-white border border-stone-300 rounded-xl px-4 py-3 text-base leading-relaxed tracking-wide text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 shadow-sm";
+  "w-full bg-white border border-stone-300 rounded-xl px-4 py-3.5 text-lg leading-relaxed tracking-wide text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 shadow-sm";
 
 function Step1({
   brief,
@@ -468,14 +523,14 @@ function Step2({
         </Field>
       </div>
 
-      <Field label="デザインスタイル">
-        <div className="grid grid-cols-3 gap-2">
+      <Field label="デザインスタイル" hint="近い雰囲気のものを選んでくれぬか。複数当てはまる場合は自由記述欄で重ねて指定できる">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {STYLES.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setBrief({ ...brief, style: s })}
-              className={`text-base px-4 py-3 rounded-xl border-2 tracking-wide font-medium shadow-sm transition-colors ${
+              className={`text-lg px-4 py-3 rounded-xl border-2 tracking-wide font-medium shadow-sm transition-colors ${
                 brief.style === s
                   ? "bg-gradient-to-r from-orange-500 to-red-500 border-orange-400 text-white"
                   : "bg-white border-stone-300 text-stone-700 hover:bg-amber-50"
@@ -488,10 +543,81 @@ function Step2({
       </Field>
 
       <Field
+        label="スタイルの自由記述"
+        hint="参考サイト URL、雑誌名、配色イメージ、フォント雰囲気など何でも"
+      >
+        <textarea
+          className={inputCls}
+          rows={3}
+          value={brief.styleCustom}
+          onChange={(e) => setBrief({ ...brief, styleCustom: e.target.value })}
+          placeholder={"例:\n・Apple の製品ページのような余白多めの上品な雰囲気\n・参考: https://stripe.com/jp\n・フォントは明朝寄り、写真はモノクロ気味"}
+        />
+      </Field>
+
+      <Field
+        label="トップ（ファーストビュー）の見せ方"
+        hint="ヒーロー部分にスライダーや動画背景を使うか"
+      >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {(
+            [
+              { v: "static", label: "静止画 1 枚" },
+              { v: "slider", label: "画像スライダー" },
+              { v: "video", label: "動画背景" },
+              { v: "gradient", label: "グラデのみ" },
+            ] as { v: HeroMode; label: string }[]
+          ).map(({ v, label }) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setBrief({ ...brief, heroMode: v })}
+              className={`text-base px-4 py-3 rounded-xl border-2 font-medium shadow-sm transition-colors ${
+                brief.heroMode === v
+                  ? "bg-gradient-to-r from-orange-500 to-red-500 border-orange-400 text-white"
+                  : "bg-white border-stone-300 text-stone-700 hover:bg-amber-50"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {brief.heroMode === "slider" && (
+        <Field
+          label="スライダー用画像 URL（複数）"
+          hint="1 行 1 URL。画像生成で作る場合は空欄でも OK。"
+        >
+          <textarea
+            className={`${inputCls} font-mono text-sm`}
+            rows={4}
+            value={brief.heroSliderUrls}
+            onChange={(e) => setBrief({ ...brief, heroSliderUrls: e.target.value })}
+            placeholder={"https://example.com/img1.jpg\nhttps://example.com/img2.jpg"}
+          />
+        </Field>
+      )}
+
+      {brief.heroMode === "video" && (
+        <Field
+          label="背景動画 URL"
+          hint="YouTube / Vimeo / 直接 mp4 URL でも OK"
+        >
+          <input
+            className={`${inputCls} font-mono text-sm`}
+            value={brief.heroVideoUrl}
+            onChange={(e) => setBrief({ ...brief, heroVideoUrl: e.target.value })}
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
+        </Field>
+      )}
+
+      <Field
         label="掲載するセクション"
         hint="チェックを入れた順番ではなく、デザインに合った順序で生成されます"
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {SECTION_OPTIONS.map((s) => (
             <label
               key={s}
@@ -505,13 +631,80 @@ function Step2({
                 type="checkbox"
                 checked={brief.sections.includes(s)}
                 onChange={() => toggleSection(s)}
-                className="accent-emerald-500"
+                className="accent-orange-500 scale-125"
               />
               {s}
             </label>
           ))}
         </div>
       </Field>
+
+      <Field
+        label="その他のセクション（自由記述）"
+        hint="1 行 1 セクション。例: 「導入の流れを動画で解説」「監修者からのメッセージ」など"
+      >
+        <textarea
+          className={inputCls}
+          rows={3}
+          value={brief.sectionsCustom}
+          onChange={(e) => setBrief({ ...brief, sectionsCustom: e.target.value })}
+          placeholder={"例:\n講師陣の対談動画\n卒業生の進路一覧\n体験会の予約カレンダー"}
+        />
+      </Field>
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 space-y-4">
+        <h3 className="text-lg font-semibold text-stone-800 tracking-wide">外部埋め込み</h3>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          URL を貼ると、その内容を LP の中に iframe で埋め込むようにアシュラに伝えます。
+        </p>
+        <Field
+          label="Google マップなど 地図の埋め込み URL"
+          hint="マップの「共有 → 地図を埋め込む」で出る iframe の src、または Google マップの共有 URL"
+        >
+          <input
+            className={`${inputCls} font-mono text-sm`}
+            value={brief.embedMapUrl}
+            onChange={(e) => setBrief({ ...brief, embedMapUrl: e.target.value })}
+            placeholder="https://www.google.com/maps/embed?pb=..."
+          />
+        </Field>
+        <Field
+          label="動画 URL（複数可）"
+          hint="1 行 1 URL。YouTube / Vimeo を埋め込み or リンク表示します"
+        >
+          <textarea
+            className={`${inputCls} font-mono text-sm`}
+            rows={3}
+            value={brief.embedVideoUrls}
+            onChange={(e) => setBrief({ ...brief, embedVideoUrls: e.target.value })}
+            placeholder={"https://www.youtube.com/watch?v=xxxxxxxx\nhttps://vimeo.com/xxxxx"}
+          />
+        </Field>
+        <Field
+          label="SNS / 外部リンク（複数可）"
+          hint="1 行 1 URL。Instagram / X / LINE / TikTok などをフッターやサイドに表示"
+        >
+          <textarea
+            className={`${inputCls} font-mono text-sm`}
+            rows={3}
+            value={brief.embedSocialUrls}
+            onChange={(e) => setBrief({ ...brief, embedSocialUrls: e.target.value })}
+            placeholder={"https://instagram.com/...\nhttps://x.com/...\nhttps://lin.ee/..."}
+          />
+        </Field>
+        <Field
+          label="そのまま貼り付けたい埋め込みコード（任意）"
+          hint="フォーム埋め込み、X 投稿、Google フォームなどの iframe / script タグ"
+        >
+          <textarea
+            className={`${inputCls} font-mono text-sm`}
+            rows={4}
+            value={brief.embedCustomHtml}
+            onChange={(e) => setBrief({ ...brief, embedCustomHtml: e.target.value })}
+            placeholder={"<iframe ...></iframe>"}
+          />
+        </Field>
+      </div>
     </section>
   );
 }
@@ -813,7 +1006,7 @@ function CharacterDialog({ ashura, mobuta }: { ashura: CharSpec; mobuta: CharSpe
           draggable={false}
         />
         <div className="relative max-w-[80%]">
-          <div className="rounded-2xl rounded-bl-sm bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 px-5 py-4 text-base leading-relaxed text-stone-800 shadow-sm">
+          <div className="rounded-2xl rounded-bl-sm bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 px-6 py-4 text-lg leading-relaxed text-stone-800 shadow-sm">
             {ashura.text}
           </div>
         </div>
@@ -827,7 +1020,7 @@ function CharacterDialog({ ashura, mobuta }: { ashura: CharSpec; mobuta: CharSpe
           draggable={false}
         />
         <div className="relative max-w-[70%]">
-          <div className="rounded-2xl rounded-br-sm bg-gradient-to-br from-violet-500 to-purple-600 px-5 py-3.5 text-base leading-relaxed text-white shadow-md">
+          <div className="rounded-2xl rounded-br-sm bg-gradient-to-br from-violet-500 to-purple-600 px-6 py-3.5 text-lg leading-relaxed text-white shadow-md">
             {mobuta.text}
           </div>
         </div>

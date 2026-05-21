@@ -23,9 +23,9 @@ body {
   background: linear-gradient(135deg, #fff7e6 0%, #fff1e0 35%, #ffe9e4 70%, #f7e2f0 100%);
   color: #2b1810;
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", Arial, Helvetica, sans-serif;
-  font-size: 17px;
-  line-height: 1.85;
-  letter-spacing: 0.04em;
+  font-size: 19px;
+  line-height: 1.9;
+  letter-spacing: 0.045em;
   min-height: 100vh;
 }
 
