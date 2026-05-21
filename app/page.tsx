@@ -29,23 +29,24 @@ type Brief = {
   embedCustomHtml: string;
 };
 
-const STYLES = [
-  "モダン",
-  "ポップ",
-  "ラグジュアリー",
-  "ミニマル",
-  "和風",
-  "サイバー",
-  "ナチュラル",
-  "レトロ",
-  "ブルータリスト",
-  "グラスモーフィズム",
-  "ニューモーフィズム",
-  "ダークモード",
-  "パステル",
-  "コーポレート",
-  "手書き / ZINE",
-  "エディトリアル雑誌風",
+type StyleSpec = { name: string; texture: string; textTone: "light" | "dark" };
+const STYLES: StyleSpec[] = [
+  { name: "モダン", texture: "modern", textTone: "light" },
+  { name: "ポップ", texture: "pop", textTone: "light" },
+  { name: "ラグジュアリー", texture: "luxury", textTone: "light" },
+  { name: "ミニマル", texture: "minimal", textTone: "dark" },
+  { name: "和風", texture: "japanese", textTone: "light" },
+  { name: "サイバー", texture: "cyber", textTone: "light" },
+  { name: "ナチュラル", texture: "natural", textTone: "light" },
+  { name: "レトロ", texture: "retro", textTone: "dark" },
+  { name: "ブルータリスト", texture: "brutalist", textTone: "dark" },
+  { name: "グラスモーフィズム", texture: "glass", textTone: "dark" },
+  { name: "ニューモーフィズム", texture: "neumorphism", textTone: "dark" },
+  { name: "ダークモード", texture: "dark", textTone: "light" },
+  { name: "パステル", texture: "pastel", textTone: "dark" },
+  { name: "コーポレート", texture: "corporate", textTone: "light" },
+  { name: "手書き / ZINE", texture: "handwritten", textTone: "dark" },
+  { name: "エディトリアル雑誌風", texture: "editorial", textTone: "dark" },
 ];
 
 const SECTION_OPTIONS = [
@@ -524,21 +525,48 @@ function Step2({
       </div>
 
       <Field label="デザインスタイル" hint="近い雰囲気のものを選んでくれぬか。複数当てはまる場合は自由記述欄で重ねて指定できる">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {STYLES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setBrief({ ...brief, style: s })}
-              className={`text-lg px-4 py-3 rounded-xl border-2 tracking-wide font-medium shadow-sm transition-colors ${
-                brief.style === s
-                  ? "bg-gradient-to-r from-orange-500 to-red-500 border-orange-400 text-white"
-                  : "bg-white border-stone-300 text-stone-700 hover:bg-amber-50"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {STYLES.map((s) => {
+            const selected = brief.style === s.name;
+            const isLight = s.textTone === "light";
+            return (
+              <button
+                key={s.name}
+                type="button"
+                onClick={() => setBrief({ ...brief, style: s.name })}
+                style={{
+                  backgroundImage: `url(/textures/${s.texture}.svg)`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+                className={`relative h-24 px-3 rounded-2xl overflow-hidden border-2 font-bold tracking-wide shadow-md transition-transform hover:scale-[1.02] focus:outline-none ${
+                  selected
+                    ? "border-orange-500 ring-4 ring-orange-200"
+                    : "border-stone-200"
+                }`}
+              >
+                <span
+                  className={`absolute inset-0 ${
+                    isLight
+                      ? "bg-gradient-to-t from-black/55 via-black/15 to-transparent"
+                      : "bg-gradient-to-t from-white/55 via-white/10 to-transparent"
+                  }`}
+                />
+                <span
+                  className={`relative z-10 text-lg drop-shadow-sm ${
+                    isLight ? "text-white" : "text-stone-900"
+                  }`}
+                >
+                  {s.name}
+                </span>
+                {selected && (
+                  <span className="absolute top-1.5 right-1.5 z-10 bg-orange-500 text-white text-xs font-bold rounded-full px-2 py-0.5 shadow">
+                    選択中
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </Field>
 
