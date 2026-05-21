@@ -25,7 +25,11 @@ export async function POST(req: NextRequest) {
     JSON.stringify(brief, null, 2),
   );
 
-  const prompt = buildCodexPrompt(brief);
+  const refs = (brief.characterRefPaths || []).filter((p) => {
+    try { return !!p && fs.existsSync(p) && fs.statSync(p).isFile(); } catch { return false; }
+  });
+  const briefForPrompt: LpBrief = { ...brief, characterRefPaths: refs };
+  const prompt = buildCodexPrompt(briefForPrompt);
   const srv = await getCodex();
 
   const encoder = new TextEncoder();

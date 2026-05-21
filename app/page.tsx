@@ -14,6 +14,8 @@ type Brief = {
   ctaLabel: string;
   ctaHref: string;
   generateImages: boolean;
+  customInstructions: string;
+  characterRefPaths: string[];
 };
 
 const STYLES = ["モダン", "ポップ", "ラグジュアリー", "ミニマル", "和風", "サイバー"];
@@ -41,6 +43,8 @@ const INITIAL: Brief = {
   ctaLabel: "今すぐ申し込む",
   ctaHref: "mailto:info@example.com",
   generateImages: true,
+  customInstructions: "",
+  characterRefPaths: [],
 };
 
 type Log = { kind: string; text: string; ts: number };
@@ -49,6 +53,7 @@ type Phase = "wizard" | "generating" | "done";
 export default function Home() {
   const [step, setStep] = useState(0);
   const [brief, setBrief] = useState<Brief>(INITIAL);
+  const [refsInput, setRefsInput] = useState("");
   const [phase, setPhase] = useState<Phase>("wizard");
   const [logs, setLogs] = useState<Log[]>([]);
   const [resultId, setResultId] = useState<string | null>(null);
@@ -79,10 +84,13 @@ export default function Home() {
     setResultId(null);
     append("info", "▶ Codex に LP 生成を依頼…");
 
+    const refPaths = refsInput.split("\n").map((s) => s.trim()).filter(Boolean);
+    const briefToSend: Brief = { ...brief, characterRefPaths: refPaths };
+
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brief }),
+      body: JSON.stringify({ brief: briefToSend }),
     });
 
     if (!res.body) {
@@ -203,12 +211,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-zinc-100">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-        <header className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">
+      <div className="max-w-4xl mx-auto px-8 py-14 space-y-10">
+        <header className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-wide leading-tight">
             ✨ LP Maker
           </h1>
-          <p className="text-zinc-400 text-sm">
+          <p className="text-zinc-400 text-base leading-relaxed">
             いくつかの質問に答えると、Codex がリッチな LP を作って画像まで差し込みます。
           </p>
         </header>
@@ -219,13 +227,20 @@ export default function Home() {
         {step === 1 && (
           <Step2 brief={brief} setBrief={setBrief} toggleSection={toggleSection} />
         )}
-        {step === 2 && <Step3 brief={brief} setBrief={setBrief} />}
+        {step === 2 && (
+          <Step3
+            brief={brief}
+            setBrief={setBrief}
+            refsInput={refsInput}
+            setRefsInput={setRefsInput}
+          />
+        )}
 
         <div className="flex justify-between pt-4">
           <button
             disabled={step === 0}
             onClick={prev}
-            className="px-4 py-2 rounded-md text-sm bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-5 py-3 rounded-md text-base bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             ← 戻る
           </button>
@@ -233,7 +248,7 @@ export default function Home() {
             <button
               onClick={next}
               disabled={step === 0 && (!brief.brand.trim() || !brief.headline.trim())}
-              className="px-5 py-2 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
+              className="px-6 py-3 rounded-md text-base font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               次へ →
             </button>
@@ -241,7 +256,7 @@ export default function Home() {
             <button
               onClick={startGenerate}
               disabled={brief.sections.length === 0}
-              className="px-5 py-2 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
+              className="px-6 py-3 rounded-md text-base font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               ▶ LP を生成する
             </button>
@@ -255,11 +270,11 @@ export default function Home() {
 function Stepper({ step }: { step: number }) {
   const labels = ["基本情報", "デザイン・構成", "CTA・画像生成"];
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex items-center gap-3 text-sm">
       {labels.map((l, i) => (
-        <div key={i} className="flex items-center gap-2 flex-1">
+        <div key={i} className="flex items-center gap-3 flex-1">
           <div
-            className={`flex items-center justify-center w-6 h-6 rounded-full border ${
+            className={`flex items-center justify-center w-8 h-8 rounded-full border text-base ${
               i <= step
                 ? "bg-emerald-600 border-emerald-500 text-white"
                 : "border-zinc-700 text-zinc-500"
@@ -267,7 +282,7 @@ function Stepper({ step }: { step: number }) {
           >
             {i + 1}
           </div>
-          <span className={i === step ? "text-zinc-100" : "text-zinc-500"}>
+          <span className={`text-base ${i === step ? "text-zinc-100" : "text-zinc-500"}`}>
             {l}
           </span>
           {i < labels.length - 1 && (
@@ -289,16 +304,16 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="block text-sm font-medium">{label}</span>
-      {hint && <span className="block text-xs text-zinc-500">{hint}</span>}
+    <label className="block space-y-2">
+      <span className="block text-base font-medium tracking-wide">{label}</span>
+      {hint && <span className="block text-sm text-zinc-500 leading-relaxed">{hint}</span>}
       {children}
     </label>
   );
 }
 
 const inputCls =
-  "w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500";
+  "w-full bg-zinc-900 border border-zinc-800 rounded-md px-4 py-3 text-base leading-relaxed tracking-wide focus:outline-none focus:ring-1 focus:ring-emerald-500";
 
 function Step1({
   brief,
@@ -405,7 +420,7 @@ function Step2({
               key={s}
               type="button"
               onClick={() => setBrief({ ...brief, style: s })}
-              className={`text-sm px-3 py-2 rounded-md border ${
+              className={`text-base px-4 py-3 rounded-md border tracking-wide ${
                 brief.style === s
                   ? "bg-emerald-600 border-emerald-500"
                   : "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
@@ -425,7 +440,7 @@ function Step2({
           {SECTION_OPTIONS.map((s) => (
             <label
               key={s}
-              className={`flex items-center gap-2 text-sm px-3 py-2 rounded-md border cursor-pointer ${
+              className={`flex items-center gap-3 text-base leading-relaxed px-4 py-3 rounded-md border cursor-pointer ${
                 brief.sections.includes(s)
                   ? "bg-emerald-900/30 border-emerald-700"
                   : "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
@@ -449,9 +464,13 @@ function Step2({
 function Step3({
   brief,
   setBrief,
+  refsInput,
+  setRefsInput,
 }: {
   brief: Brief;
   setBrief: React.Dispatch<React.SetStateAction<Brief>>;
+  refsInput: string;
+  setRefsInput: (v: string) => void;
 }) {
   return (
     <section className="space-y-5">
@@ -478,7 +497,7 @@ function Step3({
         label="画像生成 (gpt-image-2)"
         hint="Codex 組み込みの image_gen ツールで生成（ChatGPT サブスク内・API キー不要）。サブスク制限などで失敗した場合は画像なしで完成します。"
       >
-        <label className="flex items-center gap-2 text-sm bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 cursor-pointer">
+        <label className="flex items-center gap-3 text-base bg-zinc-900 border border-zinc-800 rounded-md px-4 py-3 cursor-pointer leading-relaxed">
           <input
             type="checkbox"
             checked={brief.generateImages}
@@ -489,6 +508,34 @@ function Step3({
           />
           AI 画像を生成して LP に差し込む
         </label>
+      </Field>
+
+      <Field
+        label="追加カスタム指示（自由記述）"
+        hint="各パーツの見せ方・テイスト・実装したい機能などを自由に記述。例: 「ヒーローに動画背景を入れたい」「料金表は3カラムでホバー時に拡大」「FAQ はアコーディオン式」など。記述した内容は LP 生成の最優先要件として反映されます。"
+      >
+        <textarea
+          className={inputCls}
+          rows={6}
+          value={brief.customInstructions}
+          onChange={(e) =>
+            setBrief({ ...brief, customInstructions: e.target.value })
+          }
+          placeholder={"例:\n・ヒーローは動画ループの背景にしたい\n・料金プランは年額/月額のトグル切替\n・お問い合わせフォームに Slack 風のチャット UI を実装\n・全体的に手書き風のフォントとアニメーションを多用"}
+        />
+      </Field>
+
+      <Field
+        label="キャラクター参照画像（任意）"
+        hint="image_gen の image-to-image 機能で、ヒーロー画像や各セクションに同じキャラを登場させたい場合のみ。絶対パスを 1 行 1 枚で。空欄でも OK。"
+      >
+        <textarea
+          className={`${inputCls} font-mono`}
+          rows={4}
+          value={refsInput}
+          onChange={(e) => setRefsInput(e.target.value)}
+          placeholder={"/Users/you/Desktop/ifJukuManager/Codex/images/高1.png\n/Users/you/.../山1.png"}
+        />
       </Field>
     </section>
   );

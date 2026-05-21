@@ -10,10 +10,32 @@ export type LpBrief = {
   ctaLabel: string;
   ctaHref: string;
   generateImages: boolean;
+  customInstructions?: string;
+  characterRefPaths?: string[];
 };
 
 export function buildCodexPrompt(brief: LpBrief): string {
   const sectionsStr = brief.sections.map((s) => `- ${s}`).join("\n");
+
+  const customBlock = brief.customInstructions?.trim()
+    ? `# 追加カスタム指示（ユーザー記述・最優先で反映）
+
+以下はユーザーが自由記述で指定した、各パーツの見せ方・テイスト・実装したい機能などの追加要件です。**他のデフォルト仕様より優先**して反映してください。
+
+${brief.customInstructions.trim()}
+`
+    : "";
+
+  const refs = (brief.characterRefPaths || []).filter((p) => p && p.trim().length > 0);
+  const characterBlock = refs.length
+    ? `## キャラクター参照画像（LP に登場させる）
+
+以下の画像をキャラクター参照として、LP のヒーローや各セクションに自然に登場させてください。**同一人物・同一画風・同一服装で再現**し、表情・ポーズ・構図はその場面に合わせて変える:
+
+${refs.map((p, i) => `- ref${i + 1}: ${p}`).join("\n")}
+
+image_gen ツールを呼び出すときに **これらの画像をリファレンスとして渡す**（gpt-image-2 の image-to-image 機能）。生成した PNG は \`./images/\` 配下に保存し、index.html から相対パスで参照する。`
+    : "";
 
   const imageBlock = brief.generateImages
     ? `## 画像（重要）
@@ -118,6 +140,10 @@ ${sectionsStr}
 ファーストビューとフッター直前の 2 箇所に同じ CTA を配置。
 
 ${imageBlock}
+
+${characterBlock}
+
+${customBlock}
 
 # 作業手順
 
