@@ -223,6 +223,25 @@ export default function Home() {
 
         <Stepper step={step} />
 
+        {step === 0 && (
+          <CharacterDialog
+            ashura={{ img: "ashura_suggest", text: "やぁ！どんなブランドの LP を作る？まずは基本情報を教えて〜！" }}
+            mobuta={{ img: "mobuta_present", text: "よーし、ばっちり書くぞー！" }}
+          />
+        )}
+        {step === 1 && (
+          <CharacterDialog
+            ashura={{ img: "ashura_think", text: "次はデザインだ。色とスタイル、どんな雰囲気にする？" }}
+            mobuta={{ img: "mobuta_idea", text: "こんな感じが良さそう！ピカーン💡" }}
+          />
+        )}
+        {step === 2 && (
+          <CharacterDialog
+            ashura={{ img: "ashura_normal", text: "いよいよ仕上げ！CTA や追加のこだわりを教えて。" }}
+            mobuta={{ img: "mobuta_happy", text: "完成楽しみ〜！" }}
+          />
+        )}
+
         {step === 0 && <Step1 brief={brief} setBrief={setBrief} />}
         {step === 1 && (
           <Step2 brief={brief} setBrief={setBrief} toggleSection={toggleSection} />
@@ -551,13 +570,17 @@ function GeneratingView({
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-3xl mx-auto px-6 py-12 space-y-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="text-3xl font-bold flex items-center gap-3 tracking-wide">
           <span className="inline-block w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
           生成中…
         </h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-base text-zinc-400 leading-relaxed">
           Codex が HTML を書いてから、画像を差し込みます。1〜3 分かかります。
         </p>
+        <CharacterDialog
+          ashura={{ img: "ashura_normal", text: "Codex が頑張って書いてるよ。少し待っててね。" }}
+          mobuta={{ img: "mobuta_think", text: "ドキドキ……どんな LP になるかな？" }}
+        />
         <div className="bg-black border border-zinc-800 rounded-md p-4 h-[500px] overflow-y-auto font-mono text-xs space-y-1">
           {logs.map((l, i) => (
             <div key={i} className={kindClass(l.kind)}>
@@ -631,8 +654,22 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
-        <h1 className="font-bold">🎉 LP 完成</h1>
+      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <img
+            src="/characters/ashura_happy.png"
+            alt="アシュラくん"
+            className="w-12 h-12 object-contain"
+            draggable={false}
+          />
+          <h1 className="font-bold text-lg tracking-wide">🎉 LP 完成！</h1>
+          <img
+            src="/characters/mobuta_happy.png"
+            alt="モブ太くん"
+            className="w-10 h-10 object-contain"
+            draggable={false}
+          />
+        </div>
         <div className="flex gap-2">
           <a
             href={`/api/download/${id}`}
@@ -728,6 +765,72 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
         title="LP Preview"
       />
     </main>
+  );
+}
+
+type CharSpec = { img: string; text: string };
+
+function CharacterDialog({ ashura, mobuta }: { ashura: CharSpec; mobuta: CharSpec }) {
+  return (
+    <div className="grid grid-cols-2 gap-4 items-end">
+      {/* アシュラくん：左から問いかける */}
+      <div className="flex items-end gap-3">
+        <img
+          src={`/characters/${ashura.img}.png`}
+          alt="アシュラくん"
+          className="w-28 h-28 md:w-32 md:h-32 object-contain drop-shadow-[0_4px_12px_rgba(245,158,11,0.25)] select-none"
+          draggable={false}
+        />
+        <SpeechBubble side="left" tone="ashura">
+          {ashura.text}
+        </SpeechBubble>
+      </div>
+      {/* モブ太：右でリアクション */}
+      <div className="flex items-end gap-3 flex-row-reverse">
+        <img
+          src={`/characters/${mobuta.img}.png`}
+          alt="モブ太くん"
+          className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-[0_4px_12px_rgba(16,185,129,0.25)] select-none"
+          draggable={false}
+        />
+        <SpeechBubble side="right" tone="mobuta">
+          {mobuta.text}
+        </SpeechBubble>
+      </div>
+    </div>
+  );
+}
+
+function SpeechBubble({
+  side,
+  tone,
+  children,
+}: {
+  side: "left" | "right";
+  tone: "ashura" | "mobuta";
+  children: React.ReactNode;
+}) {
+  const palette =
+    tone === "ashura"
+      ? "bg-amber-50 border-amber-300 text-zinc-900"
+      : "bg-emerald-50 border-emerald-300 text-zinc-900";
+  return (
+    <div className="relative max-w-[260px]">
+      <div
+        className={`rounded-2xl border-2 px-4 py-3 text-sm leading-relaxed shadow-md ${palette}`}
+      >
+        {children}
+      </div>
+      <span
+        className={`absolute bottom-3 ${
+          side === "left" ? "-left-2" : "-right-2"
+        } w-3 h-3 rotate-45 border-2 ${
+          tone === "ashura"
+            ? "bg-amber-50 border-amber-300"
+            : "bg-emerald-50 border-emerald-300"
+        } ${side === "left" ? "border-r-0 border-t-0" : "border-l-0 border-b-0"}`}
+      />
+    </div>
   );
 }
 
