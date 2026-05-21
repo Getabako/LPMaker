@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
         );
         return;
       }
-      send("step", { text: "✓ gh 認証 OK" });
+      send("step", { text: "[OK] gh 認証 OK" });
 
       // 3. owner を取得
       const userRes = await runCommand("gh", ["api", "user", "--jq", ".login"], projectDir);
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
         return;
       }
       const owner = userRes.stdout.trim();
-      send("step", { text: `✓ owner: ${owner}` });
+      send("step", { text: `[OK] owner: ${owner}` });
 
       const fullRepo = `${owner}/${repoName}`;
 
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 5. git init / add / commit
-      send("step", { text: "📦 git init + commit…" });
+      send("step", { text: "[push] git init + commit…" });
       // Clean any stale .git
       const gitDir = path.join(projectDir, ".git");
       if (fs.existsSync(gitDir)) {
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-      send("step", { text: "✓ ローカルコミット完了" });
+      send("step", { text: "[OK] ローカルコミット完了" });
 
       // 6. gh repo create + push
       send("step", { text: `🚀 GitHub にリポジトリ作成中: ${fullRepo}` });
@@ -160,10 +160,10 @@ export async function POST(req: NextRequest) {
         fail(`gh repo create 失敗: ${create.stderr.slice(0, 500)}`);
         return;
       }
-      send("step", { text: `✓ push 完了: https://github.com/${fullRepo}` });
+      send("step", { text: `[OK] push 完了: https://github.com/${fullRepo}` });
 
       // 7. Pages を有効化
-      send("step", { text: "🌐 GitHub Pages を有効化中…" });
+      send("step", { text: "[pages] GitHub Pages を有効化中…" });
       const pagesPayload = JSON.stringify({
         source: { branch: "main", path: "/" },
       });
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
           send("step", { text: `⚠ Pages 有効化失敗: ${(pages.stderr || pages.stdout).slice(0, 300)}（手動で Settings → Pages から有効化してください）` });
         }
       } else {
-        send("step", { text: "✓ Pages 有効化完了" });
+        send("step", { text: "[OK] Pages 有効化完了" });
       }
 
       send("done", {

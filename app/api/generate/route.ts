@@ -81,10 +81,10 @@ export async function POST(req: NextRequest) {
         switch (method) {
           case "thread/started":
             threadId = params.thread?.id;
-            send("step", { kind: "thread", text: `🧵 thread: ${threadId}` });
+            send("step", { kind: "thread", text: `thread: ${threadId}` });
             return;
           case "turn/started":
-            send("step", { kind: "turn", text: `▶ turn 開始` });
+            send("step", { kind: "turn", text: `turn 開始` });
             return;
           case "thread/status/changed":
             if (params.status?.type) {
@@ -104,9 +104,9 @@ export async function POST(req: NextRequest) {
           case "turn/plan/updated": {
             const plan = (params.plan ?? []) as Array<{ step: string; status: string }>;
             const summary = plan
-              .map((p) => `${p.status === "completed" ? "✓" : p.status === "inProgress" ? "▸" : "·"} ${p.step}`)
+              .map((p) => `${p.status === "completed" ? "[done]" : p.status === "inProgress" ? "[run]" : "[wait]"} ${p.step}`)
               .join(" / ");
-            if (summary) send("step", { kind: "plan", text: `📋 ${summary}` });
+            if (summary) send("step", { kind: "plan", text: summary });
             return;
           }
           case "item/started": {
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
             if (!item) return;
             if (item.type === "agentMessage") return;
             if (item.type === "reasoning") {
-              send("step", { kind: "reasoning", text: "🧠 思考中…" });
+              send("step", { kind: "reasoning", text: "思考中…" });
             } else if (item.type === "commandExecution") {
               const cmd = Array.isArray(item.command)
                 ? item.command.join(" ")
@@ -122,17 +122,17 @@ export async function POST(req: NextRequest) {
               send("step", { kind: "command", text: `$ ${cmd.slice(0, 200)}` });
             } else if (item.type === "fileChange") {
               const files = (item.changes || []).map((c: any) => c.path).join(", ");
-              send("step", { kind: "file", text: `📄 ${files}` });
+              send("step", { kind: "file", text: files });
             } else if (item.type === "webSearch") {
-              send("step", { kind: "web", text: `🔎 web search: ${item.query ?? ""}` });
+              send("step", { kind: "web", text: `web search: ${item.query ?? ""}` });
             } else if (item.type === "mcpToolCall") {
-              send("step", { kind: "tool", text: `🛠 ${item.server}/${item.tool}` });
+              send("step", { kind: "tool", text: `${item.server}/${item.tool}` });
             } else if (item.type === "dynamicToolCall") {
-              send("step", { kind: "tool", text: `🛠 ${item.tool}` });
+              send("step", { kind: "tool", text: item.tool });
             } else if (item.type === "imageView") {
-              send("step", { kind: "image", text: `🖼 imageView` });
+              send("step", { kind: "image", text: `imageView` });
             } else {
-              send("step", { kind: "info", text: `▸ ${item.type}` });
+              send("step", { kind: "info", text: item.type });
             }
             return;
           }
@@ -153,11 +153,11 @@ export async function POST(req: NextRequest) {
             } else if (item.type === "commandExecution") {
               send("step", {
                 kind: item.exitCode === 0 ? "command-ok" : "command-err",
-                text: `↳ exit ${item.exitCode}`,
+                text: `exit ${item.exitCode}`,
               });
             } else if (item.type === "fileChange") {
               const files = (item.changes || []).map((c: any) => c.path).join(", ");
-              send("step", { kind: "file-ok", text: `✓ 書き込み完了: ${files}` });
+              send("step", { kind: "file-ok", text: `書き込み完了: ${files}` });
             }
             return;
           }
@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
           : 0;
         send("step", {
           kind: "done",
-          text: `🎉 完成: index.html ${(fs.statSync(indexPath).size / 1024).toFixed(1)} KB, 画像 ${imageCount} 点`,
+          text: `完成: index.html ${(fs.statSync(indexPath).size / 1024).toFixed(1)} KB, 画像 ${imageCount} 点`,
         });
         send("done", { id, previewUrl: `/api/preview/${id}/index.html` });
       } catch (err) {

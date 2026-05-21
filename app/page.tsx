@@ -82,7 +82,7 @@ export default function Home() {
     setPhase("generating");
     setLogs([]);
     setResultId(null);
-    append("info", "▶ Codex に LP 生成を依頼…");
+    append("info", "Codex に LP 生成を依頼…");
 
     const refPaths = refsInput.split("\n").map((s) => s.trim()).filter(Boolean);
     const briefToSend: Brief = { ...brief, characterRefPaths: refPaths };
@@ -138,7 +138,7 @@ export default function Home() {
           const idx = p.findIndex((l) => l.kind === "heartbeat");
           const entry: Log = {
             kind: "heartbeat",
-            text: `⏱ Codex 稼働中… ${data.elapsedSec} 秒経過`,
+            text: `Codex 稼働中… ${data.elapsedSec} 秒経過`,
             ts: Date.now(),
           };
           if (idx >= 0) {
@@ -153,7 +153,7 @@ export default function Home() {
         append(data.kind || "step", data.text);
         break;
       case "agent":
-        if (data.text) append("agent", `🤖 ${data.text}`);
+        if (data.text) append("agent", data.text);
         break;
       case "delta":
         // agent message 途中経過。連続してくるので末尾の delta 行に append する
@@ -175,7 +175,7 @@ export default function Home() {
             c[c.length - 1] = { ...last, text: last.text + (data.text ?? "") };
             return c;
           }
-          return [...p, { kind: "reasoning-stream", text: "🧠 " + (data.text ?? ""), ts: Date.now() }];
+          return [...p, { kind: "reasoning-stream", text: data.text ?? "", ts: Date.now() }];
         });
         break;
       case "cmd_output":
@@ -187,7 +187,7 @@ export default function Home() {
       case "done":
         setResultId(data.id);
         setPhase("done");
-        append("done", "🎉 LP 完成！");
+        append("done", "LP 完成");
         break;
       case "error":
         append("error", data.message ?? JSON.stringify(data));
@@ -210,35 +210,32 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-zinc-100">
-      <div className="max-w-4xl mx-auto px-8 py-14 space-y-10">
-        <header className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-wide leading-tight">
-            ✨ LP Maker
-          </h1>
-          <p className="text-zinc-400 text-base leading-relaxed">
-            いくつかの質問に答えると、Codex がリッチな LP を作って画像まで差し込みます。
-          </p>
-        </header>
+    <main className="min-h-screen text-stone-800">
+      <SiteHeader />
+      <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
+        <SectionTitle
+          title="LP Maker"
+          subtitle="if(塾) ランディングページ自動生成室"
+        />
 
         <Stepper step={step} />
 
         {step === 0 && (
           <CharacterDialog
-            ashura={{ img: "ashura_suggest", text: "やぁ！どんなブランドの LP を作る？まずは基本情報を教えて〜！" }}
-            mobuta={{ img: "mobuta_present", text: "よーし、ばっちり書くぞー！" }}
+            ashura={{ img: "ashura_suggest", text: "ワシは LP Maker の案内人じゃ。どんなブランドの LP を作るか、まずは基本情報を授けてくれぬか。" }}
+            mobuta={{ img: "mobuta_present", text: "うん、ちゃんと書くね！" }}
           />
         )}
         {step === 1 && (
           <CharacterDialog
-            ashura={{ img: "ashura_think", text: "次はデザインだ。色とスタイル、どんな雰囲気にする？" }}
-            mobuta={{ img: "mobuta_idea", text: "こんな感じが良さそう！ピカーン💡" }}
+            ashura={{ img: "ashura_think", text: "次は見た目の話じゃ。色とスタイル、どんな雰囲気にしたい？" }}
+            mobuta={{ img: "mobuta_idea", text: "こんな感じがいい！" }}
           />
         )}
         {step === 2 && (
           <CharacterDialog
-            ashura={{ img: "ashura_normal", text: "いよいよ仕上げ！CTA や追加のこだわりを教えて。" }}
-            mobuta={{ img: "mobuta_happy", text: "完成楽しみ〜！" }}
+            ashura={{ img: "ashura_normal", text: "いよいよ仕上げじゃ。CTA や追加のこだわりがあれば書いてくれ。" }}
+            mobuta={{ img: "mobuta_happy", text: "完成が楽しみだなぁ！" }}
           />
         )}
 
@@ -259,30 +256,69 @@ export default function Home() {
           <button
             disabled={step === 0}
             onClick={prev}
-            className="px-5 py-3 rounded-md text-base bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-6 py-3 rounded-full text-base bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
-            ← 戻る
+            戻る
           </button>
           {step < 2 ? (
             <button
               onClick={next}
               disabled={step === 0 && (!brief.brand.trim() || !brief.headline.trim())}
-              className="px-6 py-3 rounded-md text-base font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
+              className="px-7 py-3 rounded-full text-base font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-stone-300 disabled:to-stone-300 disabled:text-stone-500 shadow-md"
             >
-              次へ →
+              次へ
             </button>
           ) : (
             <button
               onClick={startGenerate}
               disabled={brief.sections.length === 0}
-              className="px-6 py-3 rounded-md text-base font-medium bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500"
+              className="px-7 py-3 rounded-full text-base font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-stone-300 disabled:to-stone-300 disabled:text-stone-500 shadow-md"
             >
-              ▶ LP を生成する
+              LP を生成する
             </button>
           )}
         </div>
       </div>
     </main>
+  );
+}
+
+function SiteHeader() {
+  return (
+    <header className="w-full bg-white/80 backdrop-blur border-b border-stone-200 shadow-sm">
+      <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-stone-900 text-white flex items-center justify-center font-bold tracking-wider text-sm">
+            LP
+          </div>
+          <span className="font-bold tracking-wide text-stone-800">LP Maker</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-4 py-1.5 rounded-full text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium shadow-sm">
+            Ashura
+          </span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="flex items-center gap-3 pb-4 border-b border-stone-200/70">
+      <img
+        src="/characters/ashura_normal.png"
+        alt="アシュラくん"
+        className="w-12 h-12 object-contain"
+        draggable={false}
+      />
+      <div>
+        <h1 className="text-2xl font-bold tracking-wide text-orange-600">
+          {title}
+        </h1>
+        <p className="text-sm text-stone-500 leading-relaxed">{subtitle}</p>
+      </div>
+    </div>
   );
 }
 
@@ -293,19 +329,19 @@ function Stepper({ step }: { step: number }) {
       {labels.map((l, i) => (
         <div key={i} className="flex items-center gap-3 flex-1">
           <div
-            className={`flex items-center justify-center w-8 h-8 rounded-full border text-base ${
+            className={`flex items-center justify-center w-9 h-9 rounded-full border-2 text-base font-bold shadow-sm ${
               i <= step
-                ? "bg-emerald-600 border-emerald-500 text-white"
-                : "border-zinc-700 text-zinc-500"
+                ? "bg-gradient-to-br from-orange-500 to-red-500 border-orange-400 text-white"
+                : "border-stone-300 text-stone-400 bg-white"
             }`}
           >
             {i + 1}
           </div>
-          <span className={`text-base ${i === step ? "text-zinc-100" : "text-zinc-500"}`}>
+          <span className={`text-base font-medium ${i === step ? "text-stone-800" : "text-stone-400"}`}>
             {l}
           </span>
           {i < labels.length - 1 && (
-            <div className="flex-1 h-px bg-zinc-800" />
+            <div className="flex-1 h-px bg-stone-300" />
           )}
         </div>
       ))}
@@ -324,15 +360,15 @@ function Field({
 }) {
   return (
     <label className="block space-y-2">
-      <span className="block text-base font-medium tracking-wide">{label}</span>
-      {hint && <span className="block text-sm text-zinc-500 leading-relaxed">{hint}</span>}
+      <span className="block text-base font-semibold tracking-wide text-stone-800">{label}</span>
+      {hint && <span className="block text-sm text-stone-500 leading-relaxed">{hint}</span>}
       {children}
     </label>
   );
 }
 
 const inputCls =
-  "w-full bg-zinc-900 border border-zinc-800 rounded-md px-4 py-3 text-base leading-relaxed tracking-wide focus:outline-none focus:ring-1 focus:ring-emerald-500";
+  "w-full bg-white border border-stone-300 rounded-xl px-4 py-3 text-base leading-relaxed tracking-wide text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 shadow-sm";
 
 function Step1({
   brief,
@@ -400,7 +436,7 @@ function Step2({
               onChange={(e) =>
                 setBrief({ ...brief, primaryColor: e.target.value })
               }
-              className="h-10 w-12 rounded border border-zinc-800 bg-zinc-900"
+              className="h-12 w-14 rounded-lg border border-stone-300 bg-white cursor-pointer"
             />
             <input
               className={inputCls}
@@ -419,7 +455,7 @@ function Step2({
               onChange={(e) =>
                 setBrief({ ...brief, accentColor: e.target.value })
               }
-              className="h-10 w-12 rounded border border-zinc-800 bg-zinc-900"
+              className="h-12 w-14 rounded-lg border border-stone-300 bg-white cursor-pointer"
             />
             <input
               className={inputCls}
@@ -439,10 +475,10 @@ function Step2({
               key={s}
               type="button"
               onClick={() => setBrief({ ...brief, style: s })}
-              className={`text-base px-4 py-3 rounded-md border tracking-wide ${
+              className={`text-base px-4 py-3 rounded-xl border-2 tracking-wide font-medium shadow-sm transition-colors ${
                 brief.style === s
-                  ? "bg-emerald-600 border-emerald-500"
-                  : "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
+                  ? "bg-gradient-to-r from-orange-500 to-red-500 border-orange-400 text-white"
+                  : "bg-white border-stone-300 text-stone-700 hover:bg-amber-50"
               }`}
             >
               {s}
@@ -459,10 +495,10 @@ function Step2({
           {SECTION_OPTIONS.map((s) => (
             <label
               key={s}
-              className={`flex items-center gap-3 text-base leading-relaxed px-4 py-3 rounded-md border cursor-pointer ${
+              className={`flex items-center gap-3 text-base leading-relaxed px-4 py-3 rounded-xl border-2 cursor-pointer shadow-sm transition-colors ${
                 brief.sections.includes(s)
-                  ? "bg-emerald-900/30 border-emerald-700"
-                  : "bg-zinc-900 border-zinc-800 hover:bg-zinc-800"
+                  ? "bg-amber-50 border-orange-300 text-stone-800"
+                  : "bg-white border-stone-300 text-stone-700 hover:bg-amber-50/50"
               }`}
             >
               <input
@@ -516,7 +552,7 @@ function Step3({
         label="画像生成 (gpt-image-2)"
         hint="Codex 組み込みの image_gen ツールで生成（ChatGPT サブスク内・API キー不要）。サブスク制限などで失敗した場合は画像なしで完成します。"
       >
-        <label className="flex items-center gap-3 text-base bg-zinc-900 border border-zinc-800 rounded-md px-4 py-3 cursor-pointer leading-relaxed">
+        <label className="flex items-center gap-3 text-base bg-white border-2 border-stone-300 rounded-xl px-4 py-3 cursor-pointer leading-relaxed text-stone-700 shadow-sm">
           <input
             type="checkbox"
             checked={brief.generateImages}
@@ -568,23 +604,18 @@ function GeneratingView({
   logEndRef: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-6">
-        <h1 className="text-3xl font-bold flex items-center gap-3 tracking-wide">
-          <span className="inline-block w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-          生成中…
-        </h1>
-        <p className="text-base text-zinc-400 leading-relaxed">
-          Codex が HTML を書いてから、画像を差し込みます。1〜3 分かかります。
-        </p>
+    <main className="min-h-screen text-stone-800">
+      <SiteHeader />
+      <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+        <SectionTitle title="生成中" subtitle="Codex が LP を書いておるところじゃ。1〜3 分ほど待たれよ" />
         <CharacterDialog
-          ashura={{ img: "ashura_normal", text: "Codex が頑張って書いてるよ。少し待っててね。" }}
-          mobuta={{ img: "mobuta_think", text: "ドキドキ……どんな LP になるかな？" }}
+          ashura={{ img: "ashura_normal", text: "Codex が文面を整え、画像を呼び寄せておる最中じゃ。少し待たれよ。" }}
+          mobuta={{ img: "mobuta_think", text: "ドキドキ……どんな LP になるかな" }}
         />
-        <div className="bg-black border border-zinc-800 rounded-md p-4 h-[500px] overflow-y-auto font-mono text-xs space-y-1">
+        <div className="bg-stone-900 border border-stone-300 rounded-2xl p-4 h-[460px] overflow-y-auto font-mono text-xs space-y-1 shadow-inner">
           {logs.map((l, i) => (
             <div key={i} className={kindClass(l.kind)}>
-              <span className="text-zinc-600">
+              <span className="text-stone-500">
                 {new Date(l.ts).toLocaleTimeString()}
               </span>{" "}
               {l.text}
@@ -653,8 +684,8 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between gap-4">
+    <main className="min-h-screen flex flex-col text-stone-800">
+      <header className="bg-white/90 backdrop-blur border-b border-stone-200 px-6 py-3 flex items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
           <img
             src="/characters/ashura_happy.png"
@@ -662,7 +693,7 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
             className="w-12 h-12 object-contain"
             draggable={false}
           />
-          <h1 className="font-bold text-lg tracking-wide">🎉 LP 完成！</h1>
+          <h1 className="font-bold text-lg tracking-wide text-orange-600">LP が完成したぞ</h1>
           <img
             src="/characters/mobuta_happy.png"
             alt="モブ太くん"
@@ -673,27 +704,27 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
         <div className="flex gap-2">
           <a
             href={`/api/download/${id}`}
-            className="text-sm bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded"
+            className="text-sm text-white px-4 py-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 shadow-sm font-medium"
           >
-            ⬇ ZIP ダウンロード
+            ZIP ダウンロード
           </a>
           <button
             onClick={() => setPublishOpen((v) => !v)}
-            className="text-sm bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded"
+            className="text-sm text-white px-4 py-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 shadow-sm font-medium"
           >
-            🌐 GitHub Pages に公開
+            GitHub Pages に公開
           </button>
           <a
             href={`/api/preview/${id}/index.html`}
             target="_blank"
             rel="noreferrer"
-            className="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded"
+            className="text-sm bg-white border border-stone-300 hover:bg-stone-50 px-4 py-2 rounded-full text-stone-700 shadow-sm"
           >
-            ↗ 新しいタブで開く
+            新しいタブで開く
           </a>
           <button
             onClick={onReset}
-            className="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded"
+            className="text-sm bg-white border border-stone-300 hover:bg-stone-50 px-4 py-2 rounded-full text-stone-700 shadow-sm"
           >
             もう一度作る
           </button>
@@ -701,13 +732,13 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
       </header>
 
       {publishOpen && (
-        <section className="border-b border-zinc-800 px-6 py-4 bg-zinc-900/60 space-y-3">
+        <section className="border-b border-stone-200 px-6 py-4 bg-amber-50/60 space-y-3">
           {!result && !publishing && (
             <div className="flex items-end gap-2 max-w-2xl">
               <label className="flex-1 space-y-1">
-                <span className="text-xs text-zinc-400">リポジトリ名（空欄でブランド名から自動）</span>
+                <span className="text-sm text-stone-600">リポジトリ名（空欄でブランド名から自動）</span>
                 <input
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm font-mono"
+                  className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-sm font-mono text-stone-800 shadow-sm"
                   value={repoName}
                   onChange={(e) => setRepoName(e.target.value)}
                   placeholder="例: lp-cafe-lumiere"
@@ -715,14 +746,14 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
               </label>
               <button
                 onClick={publish}
-                className="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded text-sm font-medium"
+                className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white px-5 py-2 rounded-full text-sm font-medium shadow-sm"
               >
-                ▶ 公開する
+                公開する
               </button>
             </div>
           )}
           {(publishing || publishLogs.length > 0) && (
-            <div className="bg-black border border-zinc-800 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1">
+            <div className="bg-stone-900 border border-stone-300 rounded-xl p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1 shadow-inner">
               {publishLogs.map((l, i) => (
                 <div
                   key={i}
@@ -731,7 +762,7 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
                       ? "text-red-400"
                       : l.kind === "done"
                       ? "text-emerald-400 font-semibold"
-                      : "text-zinc-300"
+                      : "text-stone-200"
                   }
                 >
                   {l.text}
@@ -740,20 +771,20 @@ function ResultView({ id, onReset }: { id: string; onReset: () => void }) {
             </div>
           )}
           {result && (
-            <div className="bg-emerald-950/40 border border-emerald-700 rounded-md p-3 text-sm space-y-1">
+            <div className="bg-white border border-orange-300 rounded-xl p-4 text-sm space-y-1 shadow-sm">
               <div>
-                🌐 公開 URL:{" "}
-                <a className="text-emerald-300 underline" href={result.pagesUrl} target="_blank" rel="noreferrer">
+                公開 URL:{" "}
+                <a className="text-orange-600 underline font-medium" href={result.pagesUrl} target="_blank" rel="noreferrer">
                   {result.pagesUrl}
                 </a>
               </div>
-              <div className="text-xs text-zinc-400">
-                📦 リポジトリ:{" "}
-                <a className="text-sky-300 underline" href={result.repo} target="_blank" rel="noreferrer">
+              <div className="text-xs text-stone-500">
+                リポジトリ:{" "}
+                <a className="text-violet-600 underline" href={result.repo} target="_blank" rel="noreferrer">
                   {result.repo}
                 </a>
               </div>
-              {result.note && <div className="text-xs text-amber-300">{result.note}</div>}
+              {result.note && <div className="text-xs text-amber-600">{result.note}</div>}
             </div>
           )}
         </section>
@@ -772,64 +803,35 @@ type CharSpec = { img: string; text: string };
 
 function CharacterDialog({ ashura, mobuta }: { ashura: CharSpec; mobuta: CharSpec }) {
   return (
-    <div className="grid grid-cols-2 gap-4 items-end">
-      {/* アシュラくん：左から問いかける */}
+    <div className="space-y-5">
+      {/* アシュラくん：左から問いかける（cream bubble） */}
       <div className="flex items-end gap-3">
         <img
           src={`/characters/${ashura.img}.png`}
           alt="アシュラくん"
-          className="w-28 h-28 md:w-32 md:h-32 object-contain drop-shadow-[0_4px_12px_rgba(245,158,11,0.25)] select-none"
+          className="w-16 h-16 md:w-20 md:h-20 object-contain select-none rounded-full bg-amber-100/40 p-1"
           draggable={false}
         />
-        <SpeechBubble side="left" tone="ashura">
-          {ashura.text}
-        </SpeechBubble>
+        <div className="relative max-w-[80%]">
+          <div className="rounded-2xl rounded-bl-sm bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 px-5 py-4 text-base leading-relaxed text-stone-800 shadow-sm">
+            {ashura.text}
+          </div>
+        </div>
       </div>
-      {/* モブ太：右でリアクション */}
+      {/* モブ太：右側でリアクション（purple bubble） */}
       <div className="flex items-end gap-3 flex-row-reverse">
         <img
           src={`/characters/${mobuta.img}.png`}
           alt="モブ太くん"
-          className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-[0_4px_12px_rgba(16,185,129,0.25)] select-none"
+          className="w-14 h-14 md:w-16 md:h-16 object-contain select-none rounded-full bg-violet-100/40 p-1"
           draggable={false}
         />
-        <SpeechBubble side="right" tone="mobuta">
-          {mobuta.text}
-        </SpeechBubble>
+        <div className="relative max-w-[70%]">
+          <div className="rounded-2xl rounded-br-sm bg-gradient-to-br from-violet-500 to-purple-600 px-5 py-3.5 text-base leading-relaxed text-white shadow-md">
+            {mobuta.text}
+          </div>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function SpeechBubble({
-  side,
-  tone,
-  children,
-}: {
-  side: "left" | "right";
-  tone: "ashura" | "mobuta";
-  children: React.ReactNode;
-}) {
-  const palette =
-    tone === "ashura"
-      ? "bg-amber-50 border-amber-300 text-zinc-900"
-      : "bg-emerald-50 border-emerald-300 text-zinc-900";
-  return (
-    <div className="relative max-w-[260px]">
-      <div
-        className={`rounded-2xl border-2 px-4 py-3 text-sm leading-relaxed shadow-md ${palette}`}
-      >
-        {children}
-      </div>
-      <span
-        className={`absolute bottom-3 ${
-          side === "left" ? "-left-2" : "-right-2"
-        } w-3 h-3 rotate-45 border-2 ${
-          tone === "ashura"
-            ? "bg-amber-50 border-amber-300"
-            : "bg-emerald-50 border-emerald-300"
-        } ${side === "left" ? "border-r-0 border-t-0" : "border-l-0 border-b-0"}`}
-      />
     </div>
   );
 }
