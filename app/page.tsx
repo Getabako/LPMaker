@@ -268,7 +268,7 @@ export default function Home() {
   return (
     <main className="min-h-screen text-stone-800">
       <SiteHeader />
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
         <SectionTitle
           title="LP Maker"
           subtitle="if(塾) ランディングページ自動生成室"
@@ -426,6 +426,71 @@ function Field({
 const inputCls =
   "w-full bg-white border border-stone-300 rounded-xl px-4 py-3.5 text-lg leading-relaxed tracking-wide text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 shadow-sm";
 
+function Card({
+  badge,
+  title,
+  subtitle,
+  children,
+}: {
+  badge: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="relative rounded-3xl bg-white/85 backdrop-blur border border-stone-200 shadow-md overflow-hidden">
+      <div
+        aria-hidden
+        className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-orange-500 to-red-500"
+      />
+      <div className="p-6 md:p-8 pl-7 md:pl-9 space-y-6">
+        <SectionHead badge={badge} title={title} subtitle={subtitle} />
+        <div className="space-y-5">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function SectionHead({
+  badge,
+  title,
+  subtitle,
+}: {
+  badge: string;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="space-y-2 pb-4 border-b-2 border-dashed border-orange-200">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-[0.18em] uppercase text-white bg-gradient-to-r from-orange-500 to-red-500 shadow-sm">
+          {badge}
+        </span>
+        <h2 className="text-2xl md:text-3xl font-extrabold tracking-wide text-stone-900 leading-tight">
+          <span className="bg-gradient-to-r from-stone-900 via-orange-700 to-red-600 bg-clip-text text-transparent">
+            {title}
+          </span>
+        </h2>
+      </div>
+      {subtitle && (
+        <p className="text-base text-stone-500 leading-relaxed">{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+function SubHead({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="block w-1.5 h-5 rounded-sm bg-orange-500" />
+      <h3 className="text-lg md:text-xl font-bold text-stone-800 tracking-wide">
+        {title}
+      </h3>
+      {hint && <span className="text-sm text-stone-500">— {hint}</span>}
+    </div>
+  );
+}
+
 function Step1({
   brief,
   setBrief,
@@ -434,7 +499,11 @@ function Step1({
   setBrief: React.Dispatch<React.SetStateAction<Brief>>;
 }) {
   return (
-    <section className="space-y-5">
+    <Card
+      badge="Step 01"
+      title="ブランドの基本情報"
+      subtitle="まずは LP の核となる情報を入力してください"
+    >
       <Field label="ブランド名 / サービス名" hint="ページのタイトルに使います">
         <input
           className={inputCls}
@@ -468,7 +537,7 @@ function Step1({
           placeholder="例: 自宅で本格コーヒーを楽しみたい 30 代会社員"
         />
       </Field>
-    </section>
+    </Card>
   );
 }
 
@@ -482,7 +551,12 @@ function Step2({
   toggleSection: (s: string) => void;
 }) {
   return (
-    <section className="space-y-5">
+    <div className="space-y-8">
+    <Card
+      badge="Step 02 - A"
+      title="カラー & デザインスタイル"
+      subtitle="LP の世界観を決める色と雰囲気を選んでください"
+    >
       <div className="grid grid-cols-2 gap-4">
         <Field label="メインカラー">
           <div className="flex items-center gap-2">
@@ -582,7 +656,13 @@ function Step2({
           placeholder={"例:\n・Apple の製品ページのような余白多めの上品な雰囲気\n・参考: https://stripe.com/jp\n・フォントは明朝寄り、写真はモノクロ気味"}
         />
       </Field>
+    </Card>
 
+    <Card
+      badge="Step 02 - B"
+      title="ファーストビュー演出"
+      subtitle="LP のトップを静止画 / スライダー / 動画 などで切り替えます"
+    >
       <Field
         label="トップ（ファーストビュー）の見せ方"
         hint="ヒーロー部分にスライダーや動画背景を使うか"
@@ -640,7 +720,13 @@ function Step2({
           />
         </Field>
       )}
+    </Card>
 
+    <Card
+      badge="Step 02 - C"
+      title="セクション構成"
+      subtitle="LP に含めるブロックを選んでください"
+    >
       <Field
         label="掲載するセクション"
         hint="チェックを入れた順番ではなく、デザインに合った順序で生成されます"
@@ -679,12 +765,13 @@ function Step2({
           placeholder={"例:\n講師陣の対談動画\n卒業生の進路一覧\n体験会の予約カレンダー"}
         />
       </Field>
+    </Card>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 space-y-4">
-        <h3 className="text-lg font-semibold text-stone-800 tracking-wide">外部埋め込み</h3>
-        <p className="text-sm text-stone-600 leading-relaxed">
-          URL を貼ると、その内容を LP の中に iframe で埋め込むようにアシュラに伝えます。
-        </p>
+    <Card
+      badge="Step 02 - D"
+      title="外部埋め込み"
+      subtitle="URL を貼るだけで、Codex が iframe / リンクとして LP に組み込みます"
+    >
         <Field
           label="Google マップなど 地図の埋め込み URL"
           hint="マップの「共有 → 地図を埋め込む」で出る iframe の src、または Google マップの共有 URL"
@@ -732,8 +819,8 @@ function Step2({
             placeholder={"<iframe ...></iframe>"}
           />
         </Field>
-      </div>
-    </section>
+    </Card>
+    </div>
   );
 }
 
@@ -749,7 +836,12 @@ function Step3({
   setRefsInput: (v: string) => void;
 }) {
   return (
-    <section className="space-y-5">
+    <div className="space-y-8">
+    <Card
+      badge="Step 03 - A"
+      title="コンバージョン設定"
+      subtitle="LP のゴールとなる CTA を決めましょう"
+    >
       <div className="grid grid-cols-2 gap-4">
         <Field label="CTA ボタンの文言">
           <input
@@ -769,6 +861,13 @@ function Step3({
         </Field>
       </div>
 
+    </Card>
+
+    <Card
+      badge="Step 03 - B"
+      title="画像生成と追加指示"
+      subtitle="AI 画像と、自由記述による細かい指定"
+    >
       <Field
         label="画像生成 (gpt-image-2)"
         hint="Codex 組み込みの image_gen ツールで生成（ChatGPT サブスク内・API キー不要）。サブスク制限などで失敗した場合は画像なしで完成します。"
@@ -801,9 +900,16 @@ function Step3({
         />
       </Field>
 
+    </Card>
+
+    <Card
+      badge="Step 03 - C"
+      title="キャラクター参照（任意）"
+      subtitle="同じキャラを毎セクションに登場させたい場合は画像パスを指定"
+    >
       <Field
-        label="キャラクター参照画像（任意）"
-        hint="image_gen の image-to-image 機能で、ヒーロー画像や各セクションに同じキャラを登場させたい場合のみ。絶対パスを 1 行 1 枚で。空欄でも OK。"
+        label="キャラクター参照画像（絶対パス・1 行 1 枚）"
+        hint="image_gen の image-to-image 機能で、ヒーロー画像や各セクションに同じキャラを登場させたい場合のみ。空欄でも OK。"
       >
         <textarea
           className={`${inputCls} font-mono`}
@@ -813,7 +919,8 @@ function Step3({
           placeholder={"/Users/you/Desktop/ifJukuManager/Codex/images/高1.png\n/Users/you/.../山1.png"}
         />
       </Field>
-    </section>
+    </Card>
+    </div>
   );
 }
 
