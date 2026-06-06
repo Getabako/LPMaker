@@ -10,7 +10,10 @@ $ErrorActionPreference = "Stop"
 # --- 設定 ---
 $GH_REPO   = if ($env:LPMAKER_REPO)   { $env:LPMAKER_REPO }   else { "Getabako/LPMaker" }
 $BRANCH    = if ($env:LPMAKER_BRANCH) { $env:LPMAKER_BRANCH } else { "main" }
-$InstallDir = if ($env:LPMAKER_HOME)  { $env:LPMAKER_HOME }  else { "$HOME\.lpmaker" }
+# インストール先：デスクトップにわかりやすく置く（隠しフォルダにしない）。
+# OneDrive でデスクトップがリダイレクトされている場合も考慮して GetFolderPath を使う。
+$DesktopDir = [Environment]::GetFolderPath('Desktop')
+$InstallDir = if ($env:LPMAKER_HOME)  { $env:LPMAKER_HOME }  else { Join-Path $DesktopDir "LPMaker" }
 
 function Info($msg) { Write-Host $msg -ForegroundColor Cyan }
 function OK($msg)   { Write-Host $msg -ForegroundColor Green }
@@ -56,10 +59,25 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 }
 
 # 7. リポジトリを取得 or 更新
+# 旧フォルダ ~\.lpmaker からの移行（新しい場所が未作成なら引っ越し）
+$OldDir = Join-Path $HOME ".lpmaker"
+if ((-not $env:LPMAKER_HOME) -and (Test-Path "$OldDir\.git") -and (-not (Test-Path "$InstallDir\.git"))) {
+    Info "▶ 旧フォルダ ~\.lpmaker をデスクトップへ移動します"
+    Move-Item -Force $OldDir $InstallDir
+}
+
 if (Test-Path "$InstallDir\.git") {
-    Info "▶ 既存のアプリを最新版に更新します"
-    git -C $InstallDir fetch --quiet origin $BRANCH
-    git -C $InstallDir reset --quiet --hard "origin/$BRANCH"
+    # ローカルで修正している人の変更を消さないよう、未コミット修正があれば
+    # 自動更新（reset --hard）をスキップして保持する。
+    $dirty = git -C $InstallDir status --porcelain
+    if ($dirty) {
+        Info "▶ あなたの修正を保持したまま起動します（自動更新はスキップ）"
+        Info "  最新版に戻したい時は: cd `"$InstallDir`"; git reset --hard origin/$BRANCH"
+    } else {
+        Info "▶ 既存のアプリを最新版に更新します"
+        git -C $InstallDir fetch --quiet origin $BRANCH
+        git -C $InstallDir reset --quiet --hard "origin/$BRANCH"
+    }
 } else {
     Info "▶ アプリをダウンロードします → $InstallDir"
     if (Test-Path $InstallDir) { Remove-Item -Recurse -Force $InstallDir }
@@ -77,6 +95,14 @@ $NeedBuild = $false
 if (-not (Test-Path "$InstallDir\node_modules")) { $NeedBuild = $true }
 if (-not (Test-Path "$InstallDir\.next\standalone\server.js")) { $NeedBuild = $true }
 if ($CurSha -ne $LastSha) { $NeedBuild = $true }
+# ローカルで直したソースがビルドより新しければ、その修正を反映するため再ビルド
+if (Test-Path $MarkFile) {
+    $buildTime = (Get-Item $MarkFile).LastWriteTime
+    $srcDirs = @("app","lib","bin","public","next.config.ts","package.json") | Where-Object { Test-Path (Join-Path $InstallDir $_) }
+    $newer = Get-ChildItem -Path $srcDirs -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -gt $buildTime } | Select-Object -First 1
+    if ($newer) { $NeedBuild = $true }
+}
 
 if ($NeedBuild) {
     Info "▶ アプリを準備中（初回 or 更新時のみ）"
