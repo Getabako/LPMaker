@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { RefImagePicker } from "./components/RefImagePicker";
 
 type HeroMode = "static" | "slider" | "video" | "gradient";
 
@@ -109,7 +110,7 @@ type Phase = "wizard" | "generating" | "done";
 export default function Home() {
   const [step, setStep] = useState(0);
   const [brief, setBrief] = useState<Brief>(INITIAL);
-  const [refsInput, setRefsInput] = useState("");
+  const [refPaths, setRefPaths] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>("wizard");
   const [logs, setLogs] = useState<Log[]>([]);
   const [resultId, setResultId] = useState<string | null>(null);
@@ -140,7 +141,6 @@ export default function Home() {
     setResultId(null);
     append("info", "Codex に LP 生成を依頼…");
 
-    const refPaths = refsInput.split("\n").map((s) => s.trim()).filter(Boolean);
     const briefToSend: Brief = { ...brief, characterRefPaths: refPaths };
 
     const res = await fetch("/api/generate", {
@@ -268,7 +268,7 @@ export default function Home() {
   return (
     <main className="min-h-screen text-stone-800">
       <SiteHeader />
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
+      <div className="max-w-6xl mx-auto px-8 py-10 space-y-10">
         <SectionTitle
           title="LP Maker"
           subtitle="if(塾) ランディングページ自動生成室"
@@ -303,8 +303,8 @@ export default function Home() {
           <Step3
             brief={brief}
             setBrief={setBrief}
-            refsInput={refsInput}
-            setRefsInput={setRefsInput}
+            refPaths={refPaths}
+            setRefPaths={setRefPaths}
           />
         )}
 
@@ -342,7 +342,7 @@ export default function Home() {
 function SiteHeader() {
   return (
     <header className="w-full bg-white/80 backdrop-blur border-b border-stone-200 shadow-sm">
-      <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-stone-900 text-white flex items-center justify-center font-bold tracking-wider text-sm">
             LP
@@ -426,6 +426,187 @@ function Field({
 const inputCls =
   "w-full bg-white border border-stone-300 rounded-xl px-4 py-3.5 text-lg leading-relaxed tracking-wide text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 shadow-sm";
 
+type Accent = "sky" | "rose" | "emerald" | "violet" | "amber" | "indigo" | "teal";
+
+const ACCENT: Record<Accent, { border: string; bg: string; ring: string; ico: string; tag: string; iconBg: string }> = {
+  sky:     { border: "border-sky-300",     bg: "bg-sky-50/60",     ring: "focus:ring-sky-300 focus:border-sky-400",     ico: "text-sky-600",     tag: "bg-sky-100 text-sky-700",     iconBg: "bg-sky-100" },
+  rose:    { border: "border-rose-300",    bg: "bg-rose-50/60",    ring: "focus:ring-rose-300 focus:border-rose-400",    ico: "text-rose-600",    tag: "bg-rose-100 text-rose-700",    iconBg: "bg-rose-100" },
+  emerald: { border: "border-emerald-300", bg: "bg-emerald-50/60", ring: "focus:ring-emerald-300 focus:border-emerald-400", ico: "text-emerald-600", tag: "bg-emerald-100 text-emerald-700", iconBg: "bg-emerald-100" },
+  violet:  { border: "border-violet-300",  bg: "bg-violet-50/60",  ring: "focus:ring-violet-300 focus:border-violet-400",  ico: "text-violet-600",  tag: "bg-violet-100 text-violet-700",  iconBg: "bg-violet-100" },
+  amber:   { border: "border-amber-300",   bg: "bg-amber-50/60",   ring: "focus:ring-amber-300 focus:border-amber-400",   ico: "text-amber-600",   tag: "bg-amber-100 text-amber-700",   iconBg: "bg-amber-100" },
+  indigo:  { border: "border-indigo-300",  bg: "bg-indigo-50/60",  ring: "focus:ring-indigo-300 focus:border-indigo-400",  ico: "text-indigo-600",  tag: "bg-indigo-100 text-indigo-700",  iconBg: "bg-indigo-100" },
+  teal:    { border: "border-teal-300",    bg: "bg-teal-50/60",    ring: "focus:ring-teal-300 focus:border-teal-400",    ico: "text-teal-600",    tag: "bg-teal-100 text-teal-700",    iconBg: "bg-teal-100" },
+};
+
+function tinted(accent: Accent, mono = false) {
+  const a = ACCENT[accent];
+  return `w-full bg-white border-2 ${a.border} rounded-xl px-4 py-3.5 text-lg leading-relaxed tracking-wide text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 ${a.ring} shadow-sm ${mono ? "font-mono text-sm" : ""}`;
+}
+
+function ColoredField({
+  accent,
+  icon,
+  label,
+  hint,
+  badge,
+  children,
+}: {
+  accent: Accent;
+  icon: string;
+  label: string;
+  hint?: string;
+  badge?: string;
+  children: React.ReactNode;
+}) {
+  const a = ACCENT[accent];
+  return (
+    <div className={`rounded-2xl ${a.bg} border-2 ${a.border} p-4 md:p-5 space-y-3 shadow-sm`}>
+      <div className="flex items-start gap-4">
+        <span className={`w-14 h-14 rounded-2xl ${a.iconBg} ${a.ico} flex items-center justify-center text-3xl shrink-0 shadow-sm`}>
+          {icon}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-2xl font-bold text-stone-800 tracking-wide leading-snug">{label}</span>
+            {badge && (
+              <span className={`text-sm font-bold tracking-widest uppercase px-3 py-1 rounded-full ${a.tag}`}>
+                {badge}
+              </span>
+            )}
+          </div>
+          {hint && <p className="text-base text-stone-600 leading-relaxed mt-1.5">{hint}</p>}
+        </div>
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+type SuggestField = "brand" | "headline" | "description" | "audience" | "ctaLabel" | "customInstructions";
+
+function SuggestBox({
+  field,
+  brief,
+  value,
+  onPick,
+  accent,
+}: {
+  field: SuggestField;
+  brief: Brief;
+  value: string;
+  onPick: (v: string) => void;
+  accent: Accent;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const a = ACCENT[accent];
+
+  const run = async () => {
+    setLoading(true);
+    setError(null);
+    setItems([]);
+    setOpen(true);
+    try {
+      const res = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ field, brief, current: value }),
+      });
+      if (!res.body) throw new Error("no stream");
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+        buf += dec.decode(chunk, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          const raw = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          let ev = "message";
+          let data = "";
+          for (const line of raw.split("\n")) {
+            if (line.startsWith("event: ")) ev = line.slice(7).trim();
+            else if (line.startsWith("data: ")) data += line.slice(6);
+          }
+          if (!data) continue;
+          try {
+            const obj = JSON.parse(data);
+            if (ev === "done") setItems(obj.suggestions || []);
+            else if (ev === "error") setError(obj.message || "失敗");
+          } catch {}
+        }
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={run}
+          disabled={loading}
+          className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-lg font-bold ${a.tag} hover:brightness-95 disabled:opacity-50 shadow-sm`}
+        >
+          {loading ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              アシュラ思考中…
+            </>
+          ) : value.trim() ? (
+            <>✨ 上の「{value.trim().slice(0, 14)}{value.trim().length > 14 ? "…" : ""}」を活かして AI に案を出してもらう</>
+          ) : (
+            <>✨ 他の入力欄も読んで AI に案を出してもらう（空欄でも OK）</>
+          )}
+        </button>
+        {open && !loading && (items.length > 0 || error) && (
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-xs text-stone-500 underline"
+          >
+            閉じる
+          </button>
+        )}
+      </div>
+      {open && (loading || items.length > 0 || error) && (
+        <div className={`rounded-xl border-2 border-dashed ${a.border} bg-white/80 p-3 space-y-2`}>
+          {error && <div className="text-base text-red-600">エラー: {error}</div>}
+          {loading && items.length === 0 && (
+            <div className="text-base text-stone-600">候補を考えてもらってます…（10〜30 秒）</div>
+          )}
+          {items.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                onPick(s);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl bg-white border-2 ${a.border} hover:${a.bg} text-stone-800 text-lg leading-relaxed shadow-sm`}
+            >
+              {s}
+            </button>
+          ))}
+          {items.length > 0 && (
+            <p className="text-sm text-stone-500 leading-relaxed">
+              クリックで上の欄に入れます。入れた後そのまま手で書き換え OK。
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({
   badge,
   title,
@@ -502,41 +683,80 @@ function Step1({
     <Card
       badge="Step 01"
       title="ブランドの基本情報"
-      subtitle="まずは LP の核となる情報を入力してください"
+      subtitle="ざっくり単語を入れるだけで OK。入力した単語があれば、その雰囲気・キーワードを尊重して ✨ボタンでアシュラが複数案を提案します。空欄なら他の項目から推測します。"
     >
-      <Field label="ブランド名 / サービス名" hint="ページのタイトルに使います">
+      <ColoredField
+        accent="sky"
+        icon="🏷️"
+        label="ブランド名 / サービス名"
+        badge="Brand"
+        hint="ページのタイトルに使います。思いつかなければ ✨ で複数案を出します。"
+      >
         <input
-          className={inputCls}
+          className={tinted("sky")}
           value={brief.brand}
           onChange={(e) => setBrief({ ...brief, brand: e.target.value })}
-          placeholder="例: SunRise Coffee"
+          placeholder="例: SunRise Coffee（適当な単語でも OK）"
         />
-      </Field>
-      <Field label="キャッチコピー（1 行）" hint="ファーストビューに大きく出ます">
+        <div className="pt-2">
+          <SuggestBox field="brand" brief={brief} value={brief.brand} accent="sky" onPick={(v) => setBrief({ ...brief, brand: v })} />
+        </div>
+      </ColoredField>
+
+      <ColoredField
+        accent="rose"
+        icon="💬"
+        label="キャッチコピー（1 行）"
+        badge="Headline"
+        hint="ファーストビューに大きく出ます。雑な単語でも、他の入力から判断してアシュラが整えます。"
+      >
         <input
-          className={inputCls}
+          className={tinted("rose")}
           value={brief.headline}
           onChange={(e) => setBrief({ ...brief, headline: e.target.value })}
-          placeholder="例: 朝の 15 分を、最高の一杯から"
+          placeholder="例: 朝の 15 分を、最高の一杯から（or「速い 安い 旨い」など単語列でも OK）"
         />
-      </Field>
-      <Field label="サービス・商品の説明" hint="数行で OK。読者に何を提供するか">
+        <div className="pt-2">
+          <SuggestBox field="headline" brief={brief} value={brief.headline} accent="rose" onPick={(v) => setBrief({ ...brief, headline: v })} />
+        </div>
+      </ColoredField>
+
+      <ColoredField
+        accent="emerald"
+        icon="📝"
+        label="サービス・商品の説明"
+        badge="Description"
+        hint="数行で OK。読者に何を提供するか。書きづらければ ✨ で叩き台を出します。"
+      >
         <textarea
-          className={inputCls}
+          className={tinted("emerald")}
           rows={4}
           value={brief.description}
           onChange={(e) => setBrief({ ...brief, description: e.target.value })}
           placeholder="例: 産地直送のスペシャルティ豆を、自宅でハンドドリップ品質で淹れられるサブスクリプションサービスです。"
         />
-      </Field>
-      <Field label="ターゲット（誰に向けたページ？）">
+        <div className="pt-2">
+          <SuggestBox field="description" brief={brief} value={brief.description} accent="emerald" onPick={(v) => setBrief({ ...brief, description: v })} />
+        </div>
+      </ColoredField>
+
+      <ColoredField
+        accent="violet"
+        icon="🎯"
+        label="ターゲット（誰に向けたページ？）"
+        badge="Audience"
+        hint="読み手のペルソナ。ざっくり「30 代女性」だけでも、他の入力から具体化します。"
+      >
         <input
-          className={inputCls}
+          className={tinted("violet")}
           value={brief.audience}
           onChange={(e) => setBrief({ ...brief, audience: e.target.value })}
           placeholder="例: 自宅で本格コーヒーを楽しみたい 30 代会社員"
         />
-      </Field>
+        <div className="pt-2">
+          <SuggestBox field="audience" brief={brief} value={brief.audience} accent="violet" onPick={(v) => setBrief({ ...brief, audience: v })} />
+        </div>
+      </ColoredField>
     </Card>
   );
 }
@@ -599,7 +819,7 @@ function Step2({
       </div>
 
       <Field label="デザインスタイル" hint="近い雰囲気のものを選んでくれぬか。複数当てはまる場合は自由記述欄で重ねて指定できる">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {STYLES.map((s) => {
             const selected = brief.style === s.name;
             const isLight = s.textTone === "light";
@@ -769,56 +989,70 @@ function Step2({
 
     <Card
       badge="Step 02 - D"
-      title="外部埋め込み"
-      subtitle="URL を貼るだけで、Codex が iframe / リンクとして LP に組み込みます"
+      title="外部の埋め込みパーツ"
+      subtitle="一般的な LP の上から下までの順番で並んでいます。空欄でも LP は完成します。"
     >
-        <Field
-          label="Google マップなど 地図の埋め込み URL"
-          hint="マップの「共有 → 地図を埋め込む」で出る iframe の src、または Google マップの共有 URL"
+        <ColoredField
+          accent="rose"
+          icon="🎬"
+          label="① トップに流す紹介動画（YouTube/Vimeo）"
+          badge="Top Video"
+          hint="ファーストビュー（ページ最上部）の主役動画の URL。1 本だけ。Step 02-B で「動画背景」を選んでなくても、トップ付近に大きく埋め込まれます。"
         >
           <input
-            className={`${inputCls} font-mono text-sm`}
+            className={tinted("rose", true)}
+            value={brief.embedVideoUrls}
+            onChange={(e) => setBrief({ ...brief, embedVideoUrls: e.target.value })}
+            placeholder="https://www.youtube.com/watch?v=xxxxxxxx"
+          />
+        </ColoredField>
+
+        <ColoredField
+          accent="indigo"
+          icon="📋"
+          label="② Google フォームの埋め込みコード（お問い合わせ／申込）"
+          badge="Google Form"
+          hint={'Google フォーム →「送信」→「< >（埋め込み）」タブ → <iframe ...></iframe> をそのままコピペ。LP 下部のお問い合わせセクションに組み込まれます。'}
+        >
+          <textarea
+            className={tinted("indigo", true)}
+            rows={4}
+            value={brief.embedCustomHtml}
+            onChange={(e) => setBrief({ ...brief, embedCustomHtml: e.target.value })}
+            placeholder={'<iframe src="https://docs.google.com/forms/d/e/.../viewform?embedded=true" width="640" height="800"></iframe>'}
+          />
+        </ColoredField>
+
+        <ColoredField
+          accent="teal"
+          icon="🗺️"
+          label="③ Google マップ（店舗/教室のアクセス用）"
+          badge="Google Maps"
+          hint={'Google マップで店舗を表示 →「共有」→「地図を埋め込む」→ HTML をコピー。その中の src="..." の URL（または共有リンク）を貼り付け。アクセス／会社情報セクションに表示されます。'}
+        >
+          <input
+            className={tinted("teal", true)}
             value={brief.embedMapUrl}
             onChange={(e) => setBrief({ ...brief, embedMapUrl: e.target.value })}
             placeholder="https://www.google.com/maps/embed?pb=..."
           />
-        </Field>
-        <Field
-          label="動画 URL（複数可）"
-          hint="1 行 1 URL。YouTube / Vimeo を埋め込み or リンク表示します"
+        </ColoredField>
+
+        <ColoredField
+          accent="violet"
+          icon="🔗"
+          label="④ SNS / 外部リンク（複数可）"
+          badge="Social"
+          hint="1 行 1 URL。Instagram / X / LINE / TikTok などをフッター付近にアイコンで表示します。"
         >
           <textarea
-            className={`${inputCls} font-mono text-sm`}
-            rows={3}
-            value={brief.embedVideoUrls}
-            onChange={(e) => setBrief({ ...brief, embedVideoUrls: e.target.value })}
-            placeholder={"https://www.youtube.com/watch?v=xxxxxxxx\nhttps://vimeo.com/xxxxx"}
-          />
-        </Field>
-        <Field
-          label="SNS / 外部リンク（複数可）"
-          hint="1 行 1 URL。Instagram / X / LINE / TikTok などをフッターやサイドに表示"
-        >
-          <textarea
-            className={`${inputCls} font-mono text-sm`}
+            className={tinted("violet", true)}
             rows={3}
             value={brief.embedSocialUrls}
             onChange={(e) => setBrief({ ...brief, embedSocialUrls: e.target.value })}
             placeholder={"https://instagram.com/...\nhttps://x.com/...\nhttps://lin.ee/..."}
           />
-        </Field>
-        <Field
-          label="そのまま貼り付けたい埋め込みコード（任意）"
-          hint="フォーム埋め込み、X 投稿、Google フォームなどの iframe / script タグ"
-        >
-          <textarea
-            className={`${inputCls} font-mono text-sm`}
-            rows={4}
-            value={brief.embedCustomHtml}
-            onChange={(e) => setBrief({ ...brief, embedCustomHtml: e.target.value })}
-            placeholder={"<iframe ...></iframe>"}
-          />
-        </Field>
+        </ColoredField>
     </Card>
     </div>
   );
@@ -827,13 +1061,13 @@ function Step2({
 function Step3({
   brief,
   setBrief,
-  refsInput,
-  setRefsInput,
+  refPaths,
+  setRefPaths,
 }: {
   brief: Brief;
   setBrief: React.Dispatch<React.SetStateAction<Brief>>;
-  refsInput: string;
-  setRefsInput: (v: string) => void;
+  refPaths: string[];
+  setRefPaths: (v: string[]) => void;
 }) {
   return (
     <div className="space-y-8">
@@ -908,16 +1142,10 @@ function Step3({
       subtitle="同じキャラを毎セクションに登場させたい場合は画像パスを指定"
     >
       <Field
-        label="キャラクター参照画像（絶対パス・1 行 1 枚）"
-        hint="image_gen の image-to-image 機能で、ヒーロー画像や各セクションに同じキャラを登場させたい場合のみ。空欄でも OK。"
+        label="キャラクター参照画像（任意）"
+        hint="image_gen の image-to-image 機能で、ヒーロー画像や各セクションに同じキャラを登場させたい場合のみ。画像を直接ドラッグ&ドロップ、またはクリックして選択。"
       >
-        <textarea
-          className={`${inputCls} font-mono`}
-          rows={4}
-          value={refsInput}
-          onChange={(e) => setRefsInput(e.target.value)}
-          placeholder={"/Users/you/Desktop/ifJukuManager/Codex/images/高1.png\n/Users/you/.../山1.png"}
-        />
+        <RefImagePicker paths={refPaths} onChange={setRefPaths} />
       </Field>
     </Card>
     </div>
@@ -934,7 +1162,7 @@ function GeneratingView({
   return (
     <main className="min-h-screen text-stone-800">
       <SiteHeader />
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+      <div className="max-w-6xl mx-auto px-8 py-10 space-y-6">
         <SectionTitle title="生成中" subtitle="Codex が LP を書いておるところじゃ。1〜3 分ほど待たれよ" />
         <CharacterDialog
           ashura={{ img: "ashura_normal", text: "Codex が文面を整え、画像を呼び寄せておる最中じゃ。少し待たれよ。" }}
